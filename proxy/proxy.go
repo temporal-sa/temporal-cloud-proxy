@@ -1,16 +1,16 @@
-package main
+package proxy
 
 import (
 	"context"
 	"crypto/tls"
 	"errors"
-
 	"go.temporal.io/sdk/converter"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
+	"temporal-sa/temporal-cloud-proxy/dataconverter"
 )
 
 type ProxyConn struct {
@@ -32,7 +32,7 @@ func (mc *ProxyConn) AddConn(source, target, tlsCertPath, tlsKeyPath, encrpytion
 
 	clientInterceptor, err := converter.NewPayloadCodecGRPCClientInterceptor(
 		converter.PayloadCodecGRPCClientInterceptorOptions{
-			Codecs: []converter.PayloadCodec{NewEncryptionCodec(encrpytionKey)},
+			Codecs: []converter.PayloadCodec{dataconverter.NewEncryptionCodec(encrpytionKey)},
 		},
 	)
 	if err != nil {

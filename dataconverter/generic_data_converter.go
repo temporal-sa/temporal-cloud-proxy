@@ -1,7 +1,8 @@
-package main
+package dataconverter
 
 import (
 	"fmt"
+	"temporal-sa/temporal-cloud-proxy/utils"
 
 	commonpb "go.temporal.io/api/common/v1"
 	"go.temporal.io/sdk/converter"
@@ -44,7 +45,7 @@ func (e *Codec) Encode(payloads []*commonpb.Payload) ([]*commonpb.Payload, error
 
 		key := e.getKey(e.KeyID)
 
-		b, err := Encrypt(origBytes, key)
+		b, err := utils.Encrypt(origBytes, key)
 		if err != nil {
 			return payloads, err
 		}
@@ -78,7 +79,7 @@ func (e *Codec) Decode(payloads []*commonpb.Payload) ([]*commonpb.Payload, error
 
 		key := e.getKey(string(keyID))
 
-		b, err := Decrypt(p.Data, key)
+		b, err := utils.Decrypt(p.Data, key)
 		if err != nil {
 			return payloads, err
 		}

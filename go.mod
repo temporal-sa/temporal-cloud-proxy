@@ -3,13 +3,14 @@ module temporal-sa/temporal-cloud-proxy
 go 1.24.1
 
 require (
-	github.com/golang/snappy v1.0.0
+	github.com/urfave/cli/v2 v2.27.6
 	go.temporal.io/api v1.47.0
 	go.temporal.io/sdk v1.34.0
 	google.golang.org/grpc v1.71.1
 )
 
 require (
+	github.com/cpuguy83/go-md2man/v2 v2.0.5 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/facebookgo/clock v0.0.0-20150410010913-600d898af40a // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
@@ -20,8 +21,10 @@ require (
 	github.com/nexus-rpc/sdk-go v0.3.0 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/robfig/cron v1.2.0 // indirect
+	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/stretchr/objx v0.5.2 // indirect
 	github.com/stretchr/testify v1.10.0 // indirect
+	github.com/xrash/smetrics v0.0.0-20240521201337-686a1a2994c1 // indirect
 	golang.org/x/net v0.36.0 // indirect
 	golang.org/x/sync v0.11.0 // indirect
 	golang.org/x/sys v0.30.0 // indirect
