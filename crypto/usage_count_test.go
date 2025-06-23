@@ -14,14 +14,16 @@ import (
 )
 
 func TestUsageCount(t *testing.T) {
+	keyID := os.Getenv("KMS_KEY_ID")
+	if keyID == "" {
+		t.Skip("Skipping test: KMS_KEY_ID environment variable not set")
+	}
+
 	// Initialize AWS session and KMS client
 	sess := session.Must(session.NewSession(&aws.Config{
 		Region: aws.String(os.Getenv("AWS_REGION")),
 	}))
 	kmsClient := kms.New(sess)
-	keyID := os.Getenv("KMS_KEY_ID")
-
-	require.NotEmpty(t, keyID, "KMS_KEY_ID environment variable must be set")
 
 	// Create the AWS KMS provider
 	awsProvider := NewAWSKMSProvider(kmsClient, KMSOptions{KeyID: keyID})
@@ -75,14 +77,16 @@ func TestUsageCount(t *testing.T) {
 }
 
 func TestDecryptionWithDecryptMaterial(t *testing.T) {
+	keyID := os.Getenv("KMS_KEY_ID")
+	if keyID == "" {
+		t.Skip("Skipping test: KMS_KEY_ID environment variable not set")
+	}
+
 	// Initialize AWS session and KMS client
 	sess := session.Must(session.NewSession(&aws.Config{
 		Region: aws.String(os.Getenv("AWS_REGION")),
 	}))
 	kmsClient := kms.New(sess)
-	keyID := os.Getenv("KMS_KEY_ID")
-
-	require.NotEmpty(t, keyID, "KMS_KEY_ID environment variable must be set")
 
 	// Create the AWS KMS provider
 	awsProvider := NewAWSKMSProvider(kmsClient, KMSOptions{KeyID: keyID})
