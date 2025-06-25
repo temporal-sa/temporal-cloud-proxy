@@ -52,13 +52,14 @@ func main() {
 					t.TLS.KeyFile,
 					t.EncryptionKey,
 				)
-				err := proxyConns.AddConn(
-					t.Source+":"+strconv.Itoa(cfg.Server.Port),
-					t.Target,
-					t.TLS.CertFile,
-					t.TLS.KeyFile,
-					t.EncryptionKey,
-				)
+				err := proxyConns.AddConn(proxy.AddConnInput{
+					Source:          t.Source + ":" + strconv.Itoa(cfg.Server.Port),
+					Target:          t.Target,
+					TLSCertPath:     t.TLS.CertFile,
+					TLSKeyPath:      t.TLS.KeyFile,
+					EncryptionKeyID: t.EncryptionKey,
+					Namespace:       t.Namespace,
+				})
 				if err != nil {
 					return err
 				}

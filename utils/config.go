@@ -21,6 +21,7 @@ type TargetConfig struct {
 	Target        string    `yaml:"target"`
 	TLS           TLSConfig `yaml:"tls"`
 	EncryptionKey string    `yaml:"encryption_key"`
+	Namespace     string    `yaml:"namespace"`
 }
 
 type TLSConfig struct {
@@ -29,15 +30,15 @@ type TLSConfig struct {
 }
 
 func LoadConfig(configFilePath string) (*Config, error) {
-  configFile, err := os.ReadFile(configFilePath)
-  if err != nil {
-    return nil, err
-  }
+	configFile, err := os.ReadFile(configFilePath)
+	if err != nil {
+		return nil, err
+	}
 
-  var cfg Config
-  if err = yaml.Unmarshal(configFile, &cfg); err != nil {
-    return nil, err
-  }
+	var cfg Config
+	if err = yaml.Unmarshal(configFile, &cfg); err != nil {
+		return nil, err
+	}
 
-  return &cfg, nil
+	return &cfg, nil
 }

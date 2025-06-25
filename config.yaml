@@ -9,6 +9,7 @@ targets:
       cert_file: "/path/to/<namespace>.<account>/tls.crt"
       key_file: "/path/to/<namespace>.<account>/tls.key"
     encryption_key: "<key>"
+    namespace: "<namespace>.<account>"
 
   - source: "<namespace>.<account>.internal"
     target: "<namespace>.<account>.tmprl.cloud:7233"
@@ -16,3 +17,4 @@ targets:
       cert_file: "/path/to/<namespace>.<account>/tls.crt"
       key_file: "/path/to/<namespace>.<account>/tls.key"
     encryption_key: "<key>"
+    namespace: "<namespace>.<account>"
