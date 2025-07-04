@@ -5,17 +5,20 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
-	"go.temporal.io/sdk/converter"
 	"net"
 	"os"
 	"sync"
 	"temporal-sa/temporal-cloud-proxy/codec"
+	"temporal-sa/temporal-cloud-proxy/crypto"
+
+	"go.temporal.io/sdk/converter"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/kms"
 
 	"temporal-sa/temporal-cloud-proxy/auth"
+	"temporal-sa/temporal-cloud-proxy/metrics"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -66,6 +69,8 @@ type AddConnInput struct {
 	Namespace       string
 	AuthManager     *auth.AuthManager
 	AuthType        string
+	MetricsHandler  metrics.MetricsHandler
+	CachingConfig   *crypto.CachingConfig
 }
 
 // AddConn adds a new connection to the proxy
@@ -86,7 +91,7 @@ func (mc *Conn) AddConn(input AddConnInput) error {
 
 	clientInterceptor, err := converter.NewPayloadCodecGRPCClientInterceptor(
 		converter.PayloadCodecGRPCClientInterceptorOptions{
-			Codecs: []converter.PayloadCodec{codec.NewEncryptionCodec(kmsClient, codecContext, input.EncryptionKeyID)},
+			Codecs: []converter.PayloadCodec{codec.NewEncryptionCodecWithCaching(kmsClient, codecContext, input.EncryptionKeyID, input.MetricsHandler, input.CachingConfig)},
 		},
 	)
 	if err != nil {
