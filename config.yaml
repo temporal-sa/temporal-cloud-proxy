@@ -16,4 +16,4 @@ targets:
         trust_domain: "spiffe://example.org/"
         endpoint: "unix:///tmp/spire-agent/public/api.sock"
         audiences:
-          - "my_audience"
+          - "temporal_cloud_proxy"
