@@ -19,7 +19,24 @@ func InitPrometheus() (*metric.MeterProvider, error) {
 		metric.Instrument{Kind: metric.InstrumentKindHistogram},
 		metric.Stream{
 			Aggregation: metric.AggregationExplicitBucketHistogram{
-				Boundaries: []float64{0.00001, 0.00005, 0.0001, 0.0005, 0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0},
+				Boundaries: []float64{
+					0.00001, // 10 microseconds
+					0.00005, // 50 microseconds
+					0.0001,  // 100 microseconds
+					0.0005,  // 500 microseconds
+					0.001,   // 1 millisecond
+					0.005,   // 5 milliseconds
+					0.01,    // 10 milliseconds
+					0.025,   // 25 milliseconds
+					0.05,    // 50 milliseconds
+					0.1,     // 100 milliseconds
+					0.25,    // 250 milliseconds
+					0.5,     // 500 milliseconds
+					1.0,     // 1 second
+					2.5,     // 2.5 seconds
+					5.0,     // 5 seconds
+					10.0,    // 10 seconds
+				},
 			},
 		},
 	)
