@@ -37,20 +37,14 @@ type Codec struct {
 	MetricsHandler client.MetricsHandler
 }
 
-// NewEncryptionCodec creates a new encryption codec with the specified key ID, AWS KMS client, and codec context.
-func NewEncryptionCodec(kmsClient *kms.KMS, codecContext map[string]string, encryptionKeyID string) converter.PayloadCodec {
-	return NewEncryptionCodecWithMetrics(kmsClient, codecContext, encryptionKeyID, client.MetricsNopHandler)
-}
-
-
-
-// NewEncryptionCodecWithMetrics creates a new encryption codec with metrics support.
-func NewEncryptionCodecWithMetrics(kmsClient *kms.KMS, codecContext map[string]string, encryptionKeyID string, metricsHandler client.MetricsHandler) converter.PayloadCodec {
-	return NewEncryptionCodecWithCaching(kmsClient, codecContext, encryptionKeyID, metricsHandler, nil)
-}
-
 // NewEncryptionCodecWithCaching creates a new encryption codec with configurable caching.
-func NewEncryptionCodecWithCaching(kmsClient *kms.KMS, codecContext map[string]string, encryptionKeyID string, metricsHandler client.MetricsHandler, cachingConfig *crypto.CachingConfig) converter.PayloadCodec {
+func NewEncryptionCodecWithCaching(
+	kmsClient *kms.KMS,
+	codecContext map[string]string,
+	encryptionKeyID string,
+	metricsHandler client.MetricsHandler,
+	cachingConfig *crypto.CachingConfig,
+) converter.PayloadCodec {
 	// Set default caching config if not provided
 	if cachingConfig == nil {
 		cachingConfig = &crypto.CachingConfig{

@@ -19,6 +19,7 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/urfave/cli/v2"
+	"go.opentelemetry.io/otel/attribute"
 	"go.temporal.io/api/workflowservice/v1"
 	"go.temporal.io/sdk/client"
 	"google.golang.org/grpc"
@@ -73,7 +74,7 @@ func main() {
 			metricsServer := &http.Server{Addr: ":" + strconv.Itoa(cfg.Metrics.Port)}
 			http.Handle(metrics.DefaultPrometheusPath, promhttp.Handler())
 			go func() {
-				fmt.Printf("Exposing metrics at %s:%d%s\n", cfg.Server.Host, cfg.Metrics.Port, metrics.DefaultPrometheusPath)
+				fmt.Printf("Metrics is exposed at %s:%d%s\n", cfg.Server.Host, cfg.Metrics.Port, metrics.DefaultPrometheusPath)
 				if err := metricsServer.ListenAndServe(); err != http.ErrServerClosed {
 					log.Printf("metrics server error: %v", err)
 				}
@@ -93,7 +94,7 @@ func main() {
 				return err
 			}
 
-			fmt.Printf("listening on %s:%d\n", cfg.Server.Host, cfg.Server.Port)
+			fmt.Printf("Proxy is listening on %s:%d\n", cfg.Server.Host, cfg.Server.Port)
 
 			err = grpcServer.Serve(lis)
 
@@ -145,7 +146,16 @@ func configureProxy(proxyConns *proxy.Conn, cfg *utils.Config) error {
 			}
 		}
 
-		metricsHandler := metrics.NewMetricsHandler(metrics.MetricsHandlerOptions{})
+		metricsHandler := metrics.NewMetricsHandler(metrics.MetricsHandlerOptions{
+			// Todo: do we need these many attributes?
+			InitialAttributes: attribute.NewSet(
+				attribute.String("source", t.Source),
+				attribute.String("target", t.Target),
+				attribute.String("namespace", t.Namespace),
+				attribute.String("auth_type", authType),
+				attribute.String("encryption_key", t.EncryptionKey),
+			),
+		})
 
 		// Parse global caching config
 		var cachingConfig *crypto.CachingConfig
@@ -162,16 +172,16 @@ func configureProxy(proxyConns *proxy.Conn, cfg *utils.Config) error {
 		}
 
 		err := proxyConns.AddConn(proxy.AddConnInput{
-			Source:          t.Source,
-			Target:          t.Target,
-			TLSCertPath:     t.TLS.CertFile,
-			TLSKeyPath:      t.TLS.KeyFile,
-			EncryptionKeyID: t.EncryptionKey,
-			Namespace:       t.Namespace,
-			AuthManager:     authManager,
-			AuthType:        authType,
-			MetricsHandler:  metricsHandler,
-			CachingConfig:   cachingConfig,
+			Source:              t.Source,
+			Target:              t.Target,
+			TLSCertPath:         t.TLS.CertFile,
+			TLSKeyPath:          t.TLS.KeyFile,
+			EncryptionKeyID:     t.EncryptionKey,
+			Namespace:           t.Namespace,
+			AuthManager:         authManager,
+			AuthType:            authType,
+			MetricsHandler:      metricsHandler,
+			CryptoCachingConfig: cachingConfig,
 		})
 
 		if err != nil {

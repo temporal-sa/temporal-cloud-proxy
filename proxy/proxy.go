@@ -61,16 +61,16 @@ func createKMSClient() *kms.KMS {
 
 // AddConnInput contains parameters for adding a new connection
 type AddConnInput struct {
-	Source          string
-	Target          string
-	TLSCertPath     string
-	TLSKeyPath      string
-	EncryptionKeyID string
-	Namespace       string
-	AuthManager     *auth.AuthManager
-	AuthType        string
-	MetricsHandler  metrics.MetricsHandler
-	CachingConfig   *crypto.CachingConfig
+	Source              string
+	Target              string
+	TLSCertPath         string
+	TLSKeyPath          string
+	EncryptionKeyID     string
+	Namespace           string
+	AuthManager         *auth.AuthManager
+	AuthType            string
+	MetricsHandler      metrics.MetricsHandler
+	CryptoCachingConfig *crypto.CachingConfig
 }
 
 // AddConn adds a new connection to the proxy
@@ -91,7 +91,13 @@ func (mc *Conn) AddConn(input AddConnInput) error {
 
 	clientInterceptor, err := converter.NewPayloadCodecGRPCClientInterceptor(
 		converter.PayloadCodecGRPCClientInterceptorOptions{
-			Codecs: []converter.PayloadCodec{codec.NewEncryptionCodecWithCaching(kmsClient, codecContext, input.EncryptionKeyID, input.MetricsHandler, input.CachingConfig)},
+			Codecs: []converter.PayloadCodec{codec.NewEncryptionCodecWithCaching(
+				kmsClient,
+				codecContext,
+				input.EncryptionKeyID,
+				input.MetricsHandler,
+				input.CryptoCachingConfig,
+			)},
 		},
 	)
 	if err != nil {
