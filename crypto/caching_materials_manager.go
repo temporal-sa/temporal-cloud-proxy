@@ -86,8 +86,10 @@ func (c *CachingMaterialsManager) GetMaterial(ctx context.Context, cryptoCtx Cry
 	material, err := c.underlyingMM.GetMaterial(ctx, cryptoCtx)
 	c.metricsHandler.Timer(metrics.MaterialsManagerGetLatency).Record(time.Since(start))
 	if err != nil {
+		c.metricsHandler.Counter(metrics.MaterialsManagerGetErrors).Inc(1)
 		return nil, err
 	}
+	c.metricsHandler.Counter(metrics.MaterialsManagerGetSuccess).Inc(1)
 
 	// Initialize usage metadata
 	material.CreatedAt = time.Now()
@@ -134,8 +136,10 @@ func (c *CachingMaterialsManager) DecryptMaterial(ctx context.Context, cryptoCtx
 	decryptedMaterial, err := c.underlyingMM.DecryptMaterial(ctx, cryptoCtx, material)
 	c.metricsHandler.Timer(metrics.MaterialsManagerDecryptLatency).Record(time.Since(start))
 	if err != nil {
+		c.metricsHandler.Counter(metrics.MaterialsManagerDecryptErrors).Inc(1)
 		return nil, err
 	}
+	c.metricsHandler.Counter(metrics.MaterialsManagerDecryptSuccess).Inc(1)
 
 	// Initialize usage metadata
 	decryptedMaterial.CreatedAt = time.Now()
