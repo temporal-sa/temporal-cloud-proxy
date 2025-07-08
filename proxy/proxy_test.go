@@ -118,7 +118,7 @@ func TestConn_AddConn(t *testing.T) {
 		{
 			name: "successful connection addition",
 			input: AddConnInput{
-				Source:          "test-source",
+				ProxyId:         "test-proxy-id",
 				Target:          "localhost:7233",
 				TLSCertPath:     certPath,
 				TLSKeyPath:      keyPath,
@@ -132,7 +132,7 @@ func TestConn_AddConn(t *testing.T) {
 		{
 			name: "invalid certificate path",
 			input: AddConnInput{
-				Source:          "test-source",
+				ProxyId:         "test-proxy-id",
 				Target:          "localhost:7233",
 				TLSCertPath:     "/nonexistent/cert.pem",
 				TLSKeyPath:      keyPath,
@@ -146,7 +146,7 @@ func TestConn_AddConn(t *testing.T) {
 		{
 			name: "invalid key path",
 			input: AddConnInput{
-				Source:          "test-source",
+				ProxyId:         "test-proxy-id",
 				Target:          "localhost:7233",
 				TLSCertPath:     certPath,
 				TLSKeyPath:      "/nonexistent/key.pem",
@@ -160,7 +160,7 @@ func TestConn_AddConn(t *testing.T) {
 		{
 			name: "connection without auth manager",
 			input: AddConnInput{
-				Source:          "test-source-no-auth",
+				ProxyId:         "test-proxy-id-no-auth",
 				Target:          "localhost:7233",
 				TLSCertPath:     certPath,
 				TLSKeyPath:      keyPath,
@@ -188,7 +188,7 @@ func TestConn_AddConn(t *testing.T) {
 				assert.Equal(t, 1, len(conn.namespace))
 
 				// Verify the connection was stored correctly
-				nsConn, exists := conn.namespace[tt.input.Source]
+				nsConn, exists := conn.namespace[tt.input.ProxyId]
 				assert.True(t, exists)
 				assert.NotNil(t, nsConn.conn)
 				assert.Equal(t, tt.input.AuthManager, nsConn.authManager)
@@ -229,7 +229,7 @@ func TestConn_Invoke(t *testing.T) {
 			expectedCode: codes.InvalidArgument,
 		},
 		{
-			name: "missing authority",
+			name: "missing proxy-id",
 			setupContext: func() context.Context {
 				md := metadata.New(map[string]string{})
 				return metadata.NewIncomingContext(context.Background(), md)
@@ -240,14 +240,14 @@ func TestConn_Invoke(t *testing.T) {
 			method:        "/test.Service/Method",
 			expectError:   true,
 			expectedCode:  codes.InvalidArgument,
-			errorContains: "metadata missing :authority",
+			errorContains: "metadata missing proxy-id",
 		},
 		{
-			name: "multiple authority entries",
+			name: "multiple proxy-id entries",
 			setupContext: func() context.Context {
 				md := metadata.New(map[string]string{})
-				md.Append(":authority", "source1")
-				md.Append(":authority", "source2")
+				md.Append("proxy-id", "proxy-id-1")
+				md.Append("proxy-id", "proxy-id-2")
 				return metadata.NewIncomingContext(context.Background(), md)
 			},
 			setupConn: func() *Conn {
@@ -256,13 +256,13 @@ func TestConn_Invoke(t *testing.T) {
 			method:        "/test.Service/Method",
 			expectError:   true,
 			expectedCode:  codes.InvalidArgument,
-			errorContains: "multiple :authority entries",
+			errorContains: "multiple proxy-id entries",
 		},
 		{
 			name: "target not found",
 			setupContext: func() context.Context {
 				md := metadata.New(map[string]string{
-					":authority": "nonexistent-source",
+					"proxy-id": "nonexistent-proxy-id",
 				})
 				return metadata.NewIncomingContext(context.Background(), md)
 			},
@@ -272,13 +272,13 @@ func TestConn_Invoke(t *testing.T) {
 			method:        "/test.Service/Method",
 			expectError:   true,
 			expectedCode:  codes.InvalidArgument,
-			errorContains: "invalid target: nonexistent-source",
+			errorContains: "invalid proxy-id: nonexistent-proxy-id",
 		},
 		{
 			name: "invoke without authentication - skips auth logic",
 			setupContext: func() context.Context {
 				md := metadata.New(map[string]string{
-					":authority": "test-source-no-auth",
+					"proxy-id": "test-proxy-id-no-auth",
 				})
 				return metadata.NewIncomingContext(context.Background(), md)
 			},
@@ -293,13 +293,13 @@ func TestConn_Invoke(t *testing.T) {
 			reply:         struct{}{},
 			expectError:   true,
 			expectedCode:  codes.InvalidArgument,
-			errorContains: "invalid target: test-source-no-auth",
+			errorContains: "invalid proxy-id: test-proxy-id-no-auth",
 		},
 		{
 			name: "missing authorization with auth manager",
 			setupContext: func() context.Context {
 				md := metadata.New(map[string]string{
-					":authority": "test-source",
+					"proxy-id": "test-proxy-id",
 				})
 				return metadata.NewIncomingContext(context.Background(), md)
 			},
@@ -308,7 +308,7 @@ func TestConn_Invoke(t *testing.T) {
 				// Create a real auth manager for testing
 				authManager := auth.NewAuthManager()
 
-				conn.namespace["test-source"] = NamespaceConn{
+				conn.namespace["test-proxy-id"] = NamespaceConn{
 					conn:        nil,
 					authManager: authManager,
 					authType:    "jwt",
@@ -324,7 +324,7 @@ func TestConn_Invoke(t *testing.T) {
 			name: "multiple authorization entries",
 			setupContext: func() context.Context {
 				md := metadata.New(map[string]string{
-					":authority": "test-source",
+					"proxy-id": "test-proxy-id",
 				})
 				md.Append("authorization", "Bearer token1")
 				md.Append("authorization", "Bearer token2")
@@ -335,7 +335,7 @@ func TestConn_Invoke(t *testing.T) {
 				// Create a real auth manager for testing
 				authManager := auth.NewAuthManager()
 
-				conn.namespace["test-source"] = NamespaceConn{
+				conn.namespace["test-proxy-id"] = NamespaceConn{
 					conn:        nil,
 					authManager: authManager,
 					authType:    "jwt",
@@ -346,26 +346,6 @@ func TestConn_Invoke(t *testing.T) {
 			expectError:   true,
 			expectedCode:  codes.InvalidArgument,
 			errorContains: "multiple authorization entries",
-		},
-		{
-			name: "authority with port - strips port for lookup",
-			setupContext: func() context.Context {
-				md := metadata.New(map[string]string{
-					":authority": "test-source:8080",
-				})
-				return metadata.NewIncomingContext(context.Background(), md)
-			},
-			setupConn: func() *Conn {
-				conn := NewConn()
-				// Test that port is stripped by NOT adding "test-source:8080" but only "test-source"
-				// This should result in a successful lookup (but then fail because conn is nil)
-				// If port stripping didn't work, it would fail with "invalid target" instead
-				return conn
-			},
-			method:        "/test.Service/Method",
-			expectError:   true,
-			expectedCode:  codes.InvalidArgument,
-			errorContains: "invalid target: test-source:8080", // Shows the original authority in error
 		},
 	}
 
@@ -450,7 +430,7 @@ func TestConn_ConcurrentAccess(t *testing.T) {
 			defer wg.Done()
 
 			input := AddConnInput{
-				Source:          fmt.Sprintf("source-%d", id),
+				ProxyId:         fmt.Sprintf("proxy-id-%d", id),
 				Target:          "localhost:7233",
 				TLSCertPath:     certPath,
 				TLSKeyPath:      keyPath,
@@ -478,9 +458,9 @@ func TestConn_ConcurrentAccess(t *testing.T) {
 		go func(id int) {
 			defer wg.Done()
 
-			sourceId := id % numConnections
+			proxyId := id % numConnections
 			md := metadata.New(map[string]string{
-				":authority": fmt.Sprintf("source-%d", sourceId),
+				"proxy-id": fmt.Sprintf("proxy-id-%d", proxyId),
 			})
 			ctx := metadata.NewIncomingContext(context.Background(), md)
 
@@ -528,7 +508,7 @@ func TestConn_InvokeWithAuthentication(t *testing.T) {
 			name: "missing authorization header",
 			setupContext: func() context.Context {
 				md := metadata.New(map[string]string{
-					":authority": "test-source",
+					"proxy-id": "test-proxy-id",
 				})
 				return metadata.NewIncomingContext(context.Background(), md)
 			},
@@ -539,7 +519,7 @@ func TestConn_InvokeWithAuthentication(t *testing.T) {
 	}
 
 	// Add a namespace with auth manager (using nil since we can't easily mock the interface)
-	conn.namespace["test-source"] = NamespaceConn{
+	conn.namespace["test-proxy-id"] = NamespaceConn{
 		conn:        nil, // Will cause failure, but we're testing auth logic first
 		authManager: nil, // We'll set this to non-nil to trigger auth checks
 		authType:    "jwt",
@@ -548,9 +528,9 @@ func TestConn_InvokeWithAuthentication(t *testing.T) {
 	// Set authManager to non-nil to trigger the auth logic
 	// Use a real auth manager since we can't easily mock the interface
 	authManager := auth.NewAuthManager()
-	nsConn := conn.namespace["test-source"]
+	nsConn := conn.namespace["test-proxy-id"]
 	nsConn.authManager = authManager
-	conn.namespace["test-source"] = nsConn
+	conn.namespace["test-proxy-id"] = nsConn
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

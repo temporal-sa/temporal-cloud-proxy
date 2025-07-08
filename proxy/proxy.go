@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"go.temporal.io/sdk/converter"
-	"net"
 	"os"
 	"sync"
 	"temporal-sa/temporal-cloud-proxy/codec"
@@ -58,7 +57,7 @@ func createKMSClient() *kms.KMS {
 
 // AddConnInput contains parameters for adding a new connection
 type AddConnInput struct {
-	Source          string
+	ProxyId         string
 	Target          string
 	TLSCertPath     string
 	TLSKeyPath      string
@@ -70,7 +69,7 @@ type AddConnInput struct {
 
 // AddConn adds a new connection to the proxy
 func (mc *Conn) AddConn(input AddConnInput) error {
-	fmt.Println("Adding connection from", input.Source, "to", input.Target)
+	fmt.Printf("Adding connection id: %s target: %s\n", input.ProxyId, input.Target)
 
 	cert, err := tls.LoadX509KeyPair(input.TLSCertPath, input.TLSKeyPath)
 	if err != nil {
@@ -107,7 +106,7 @@ func (mc *Conn) AddConn(input AddConnInput) error {
 	}
 
 	mc.mu.Lock()
-	mc.namespace[input.Source] = NamespaceConn{
+	mc.namespace[input.ProxyId] = NamespaceConn{
 		conn:        conn,
 		authManager: input.AuthManager,
 		authType:    input.AuthType,
@@ -143,28 +142,21 @@ func (mc *Conn) Invoke(ctx context.Context, method string, args interface{}, rep
 		return status.Errorf(codes.InvalidArgument, "unable to read metadata")
 	}
 
-	target := md.Get(":authority")
+	proxyId := md.Get("proxy-id")
 
-	if len(target) <= 0 {
-		return status.Error(codes.InvalidArgument, "metadata missing :authority")
+	if len(proxyId) <= 0 {
+		return status.Error(codes.InvalidArgument, "metadata missing proxy-id")
 	}
-	if len(target) != 1 {
-		return status.Error(codes.InvalidArgument, "metadata contains multiple :authority entries")
-	}
-
-	// The proxy only listens on one port. If for whatever reason the host contains
-	// the port, remove it.
-	host, _, err := net.SplitHostPort(target[0])
-	if err != nil {
-		host = target[0]
+	if len(proxyId) != 1 {
+		return status.Error(codes.InvalidArgument, "metadata contains multiple proxy-id entries")
 	}
 
 	mc.mu.RLock()
-	namespace, exists := mc.namespace[host]
+	namespace, exists := mc.namespace[proxyId[0]]
 	mc.mu.RUnlock()
 
 	if !exists {
-		return status.Errorf(codes.InvalidArgument, "invalid target: %s", target[0])
+		return status.Errorf(codes.InvalidArgument, "invalid proxy-id: %s", proxyId[0])
 	}
 
 	if namespace.authManager != nil {

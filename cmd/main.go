@@ -20,6 +20,7 @@ import (
 var configFilePath string
 
 // TODO: graceful shutdown
+// TODO: refactor
 func main() {
 	app := &cli.App{
 		Name:  "tclp",
@@ -67,7 +68,6 @@ func main() {
 			}
 
 			fmt.Printf("listening on %s:%d\n", cfg.Server.Host, cfg.Server.Port)
-
 			err = grpcServer.Serve(lis)
 
 			return err
@@ -119,7 +119,7 @@ func configureProxy(proxyConns *proxy.Conn, cfg *utils.Config) error {
 		}
 
 		err := proxyConns.AddConn(proxy.AddConnInput{
-			Source:          t.Source,
+			ProxyId:         t.ProxyId,
 			Target:          t.Target,
 			TLSCertPath:     t.TLS.CertFile,
 			TLSKeyPath:      t.TLS.KeyFile,

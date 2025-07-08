@@ -20,7 +20,7 @@ server:
   port: 7233
   host: "0.0.0.0"
 targets:
-  - source: "test.namespace.internal"
+  - proxy_id: "test.namespace.internal"
     target: "test.namespace.tmprl.cloud:7233"
     tls:
       cert_file: "/path/to/cert.crt"
@@ -42,7 +42,7 @@ targets:
 				},
 				Targets: []TargetConfig{
 					{
-						Source:        "test.namespace.internal",
+						ProxyId:       "test.namespace.internal",
 						Target:        "test.namespace.tmprl.cloud:7233",
 						EncryptionKey: "test-key",
 						Namespace:     "test.namespace",
@@ -70,7 +70,7 @@ server:
   port: 8080
   host: "localhost"
 targets:
-  - source: "simple.internal"
+  - proxy_id: "simple.internal"
     target: "simple.external:8080"
     tls:
       cert_file: "/cert.crt"
@@ -85,7 +85,7 @@ targets:
 				},
 				Targets: []TargetConfig{
 					{
-						Source:        "simple.internal",
+						ProxyId:       "simple.internal",
 						Target:        "simple.external:8080",
 						EncryptionKey: "simple-key",
 						Namespace:     "simple",
@@ -106,14 +106,14 @@ server:
   port: 9090
   host: "127.0.0.1"
 targets:
-  - source: "target1.internal"
+  - proxy_id: "target1.internal"
     target: "target1.external:9090"
     tls:
       cert_file: "/target1.crt"
       key_file: "/target1.key"
     encryption_key: "key1"
     namespace: "namespace1"
-  - source: "target2.internal"
+  - proxy_id: "target2.internal"
     target: "target2.external:9091"
     tls:
       cert_file: "/target2.crt"
@@ -133,7 +133,7 @@ targets:
 				},
 				Targets: []TargetConfig{
 					{
-						Source:        "target1.internal",
+						ProxyId:       "target1.internal",
 						Target:        "target1.external:9090",
 						EncryptionKey: "key1",
 						Namespace:     "namespace1",
@@ -144,7 +144,7 @@ targets:
 						Authentication: nil,
 					},
 					{
-						Source:        "target2.internal",
+						ProxyId:       "target2.internal",
 						Target:        "target2.external:9091",
 						EncryptionKey: "key2",
 						Namespace:     "namespace2",
@@ -244,7 +244,7 @@ func TestServerConfig_Validation(t *testing.T) {
 
 func TestTargetConfig_Structure(t *testing.T) {
 	target := TargetConfig{
-		Source:        "test.internal",
+		ProxyId:       "test.internal",
 		Target:        "test.external:7233",
 		EncryptionKey: "test-key",
 		Namespace:     "test-namespace",
@@ -260,8 +260,8 @@ func TestTargetConfig_Structure(t *testing.T) {
 		},
 	}
 
-	if target.Source != "test.internal" {
-		t.Errorf("Expected Source to be 'test.internal', got %s", target.Source)
+	if target.ProxyId != "test.internal" {
+		t.Errorf("Expected ProxyId to be 'test.internal', got %s", target.ProxyId)
 	}
 	if target.Target != "test.external:7233" {
 		t.Errorf("Expected Target to be 'test.external:7233', got %s", target.Target)
@@ -363,7 +363,7 @@ func configEqual(a, b Config) bool {
 }
 
 func targetConfigEqual(a, b TargetConfig) bool {
-	if a.Source != b.Source || a.Target != b.Target || a.EncryptionKey != b.EncryptionKey || a.Namespace != b.Namespace {
+	if a.ProxyId != b.ProxyId || a.Target != b.Target || a.EncryptionKey != b.EncryptionKey || a.Namespace != b.Namespace {
 		return false
 	}
 

@@ -11,7 +11,7 @@ type ServerConfig struct {
 }
 
 type TargetConfig struct {
-	Source         string      `yaml:"source"`
+	ProxyId        string      `yaml:"proxy_id"`
 	Target         string      `yaml:"target"`
 	TLS            TLSConfig   `yaml:"tls"`
 	EncryptionKey  string      `yaml:"encryption_key"`
