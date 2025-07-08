@@ -9,12 +9,14 @@ import (
 	"os"
 	"sync"
 	"temporal-sa/temporal-cloud-proxy/codec"
+	"temporal-sa/temporal-cloud-proxy/crypto"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/kms"
 
 	"temporal-sa/temporal-cloud-proxy/auth"
+	"temporal-sa/temporal-cloud-proxy/metrics"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -57,14 +59,16 @@ func createKMSClient() *kms.KMS {
 
 // AddConnInput contains parameters for adding a new connection
 type AddConnInput struct {
-	ProxyId         string
-	Target          string
-	TLSCertPath     string
-	TLSKeyPath      string
-	EncryptionKeyID string
-	Namespace       string
-	AuthManager     *auth.AuthManager
-	AuthType        string
+	ProxyId             string
+	Target              string
+	TLSCertPath         string
+	TLSKeyPath          string
+	EncryptionKeyID     string
+	Namespace           string
+	AuthManager         *auth.AuthManager
+	AuthType            string
+	MetricsHandler      metrics.MetricsHandler
+	CryptoCachingConfig *crypto.CachingConfig
 }
 
 // AddConn adds a new connection to the proxy
@@ -85,7 +89,13 @@ func (mc *Conn) AddConn(input AddConnInput) error {
 
 	clientInterceptor, err := converter.NewPayloadCodecGRPCClientInterceptor(
 		converter.PayloadCodecGRPCClientInterceptorOptions{
-			Codecs: []converter.PayloadCodec{codec.NewEncryptionCodec(kmsClient, codecContext, input.EncryptionKeyID)},
+			Codecs: []converter.PayloadCodec{codec.NewEncryptionCodecWithCaching(
+				kmsClient,
+				codecContext,
+				input.EncryptionKeyID,
+				input.MetricsHandler,
+				input.CryptoCachingConfig,
+			)},
 		},
 	)
 	if err != nil {
