@@ -9,7 +9,7 @@ encryption:
     max_age: "10m"
     max_usage: 100
 targets:
-  - source: "<namespace>.<account>.internal"
+  - proxy_id: "<namespace>.<account>.internal"
     target: "<namespace>.<account>.tmprl.cloud:7233"
     tls:
       cert_file: "/path/to/<namespace>.<account>/tls.crt"
