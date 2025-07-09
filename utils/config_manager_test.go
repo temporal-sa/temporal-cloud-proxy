@@ -24,7 +24,7 @@ server:
   port: 7233
   host: "0.0.0.0"
 targets:
-  - source: "test.internal"
+  - proxy_id: "test.internal"
     target: "test.external:7233"
     tls:
       cert_file: "/path/to/cert.crt"
@@ -55,7 +55,7 @@ server:
   port: 7233
   host: "0.0.0.0"
 targets:
-  - source: "test.internal"
+  - proxy_id: "test.internal"
     target: "test.external:7233"
     invalid: yaml: [
 `,
@@ -135,14 +135,14 @@ server:
   port: 9090
   host: "127.0.0.1"
 targets:
-  - source: "test1.internal"
+  - proxy_id: "test1.internal"
     target: "test1.external:9090"
     tls:
       cert_file: "/test1.crt"
       key_file: "/test1.key"
     encryption_key: "key1"
     namespace: "namespace1"
-  - source: "test2.internal"
+  - proxy_id: "test2.internal"
     target: "test2.external:9091"
     tls:
       cert_file: "/test2.crt"
@@ -189,8 +189,8 @@ targets:
 
 	if len(config.Targets) >= 1 {
 		target1 := config.Targets[0]
-		if target1.Source != "test1.internal" {
-			t.Errorf("Expected first target source to be 'test1.internal', got %s", target1.Source)
+		if target1.ProxyId != "test1.internal" {
+			t.Errorf("Expected first target proxy_id to be 'test1.internal', got %s", target1.ProxyId)
 		}
 		if target1.Authentication != nil {
 			t.Error("Expected first target to have no authentication")
@@ -199,8 +199,8 @@ targets:
 
 	if len(config.Targets) >= 2 {
 		target2 := config.Targets[1]
-		if target2.Source != "test2.internal" {
-			t.Errorf("Expected second target source to be 'test2.internal', got %s", target2.Source)
+		if target2.ProxyId != "test2.internal" {
+			t.Errorf("Expected second target proxy_id to be 'test2.internal', got %s", target2.ProxyId)
 		}
 		if target2.Authentication == nil {
 			t.Error("Expected second target to have authentication")
@@ -216,7 +216,7 @@ server:
   port: 8080
   host: "localhost"
 targets:
-  - source: "concurrent.internal"
+  - proxy_id: "concurrent.internal"
     target: "concurrent.external:8080"
     tls:
       cert_file: "/concurrent.crt"
@@ -263,7 +263,7 @@ targets:
 					errors <- err
 					return
 				}
-				if config.Targets[0].Source != "concurrent.internal" {
+				if config.Targets[0].ProxyId != "concurrent.internal" {
 					errors <- err
 					return
 				}
@@ -329,7 +329,7 @@ server:
   port: 7233
   host: "0.0.0.0"
 targets:
-  - source: "test.internal"
+  - proxy_id: "test.internal"
     target: "test.external:7233"
     tls:
       cert_file: "/path/to/cert.crt"
@@ -358,7 +358,7 @@ server:
   port: 7233
   host: "0.0.0.0"
 targets:
-  - source: "test.internal"
+  - proxy_id: "test.internal"
     target: "test.external:7233"
     invalid: [unclosed
 `,
@@ -506,7 +506,7 @@ server:
   port: 7233
   host: "0.0.0.0"
 targets:
-  - source: "bench.internal"
+  - proxy_id: "bench.internal"
     target: "bench.external:7233"
     tls:
       cert_file: "/bench.crt"
@@ -545,7 +545,7 @@ server:
   port: 7233
   host: "0.0.0.0"
 targets:
-  - source: "bench.internal"
+  - proxy_id: "bench.internal"
     target: "bench.external:7233"
     tls:
       cert_file: "/bench.crt"

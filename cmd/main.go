@@ -149,7 +149,7 @@ func configureProxy(proxyConns *proxy.Conn, cfg *utils.Config) error {
 		metricsHandler := metrics.NewMetricsHandler(metrics.MetricsHandlerOptions{
 			// Todo: do we need these many attributes?
 			InitialAttributes: attribute.NewSet(
-				attribute.String("source", t.Source),
+				attribute.String("proxy-id", t.ProxyId),
 				attribute.String("target", t.Target),
 				attribute.String("namespace", t.Namespace),
 				attribute.String("auth_type", authType),
@@ -172,7 +172,7 @@ func configureProxy(proxyConns *proxy.Conn, cfg *utils.Config) error {
 		}
 
 		err := proxyConns.AddConn(proxy.AddConnInput{
-			Source:              t.Source,
+			ProxyId:             t.ProxyId,
 			Target:              t.Target,
 			TLSCertPath:         t.TLS.CertFile,
 			TLSKeyPath:          t.TLS.KeyFile,
