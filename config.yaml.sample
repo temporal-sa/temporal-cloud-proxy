@@ -1,21 +1,29 @@
 server:
   port: 7233
   host: "0.0.0.0"
+
 metrics:
   port: 9090
+
 encryption:
   caching:
     max_cache: 100
     max_age: "10m"
     max_usage: 100
+
 targets:
-  - source: "<namespace>.<account>.internal"
-    target: "<namespace>.<account>.tmprl.cloud:7233"
-    tls:
-      cert_file: "/path/to/<namespace>.<account>/tls.crt"
-      key_file: "/path/to/<namespace>.<account>/tls.key"
+  - proxy_id: "<namespace>.<account>.internal"
+    temporal_cloud:
+      namespace: "<namespace>.<account>"
+      host_port: "<namespace>.<account>.tmprl.cloud:7233" # endpoint when using mTLS
+      # host_port: "<region>.<cloud>.api.temporal.io:7233" # endpoint when using API keys
+      authentication:
+        # only set either tls or api_key
+        tls:
+          cert_file: "/path/to/<namespace>.<account>/tls.crt"
+          key_file: "/path/to/<namespace>.<account>/tls.key"
+        api_key: "<api key>"
     encryption_key: "<key>"
-    namespace: "<namespace>.<account>"
     authentication:
       type: "spiffe"
       config:
@@ -24,13 +32,18 @@ targets:
         audiences:
           - "temporal_cloud_proxy"
 
-  - source: "<namespace>.<account>.internal"
-    target: "<namespace>.<account>.tmprl.cloud:7233"
-    tls:
-      cert_file: "/path/to/<namespace>.<account>/tls.crt"
-      key_file: "/path/to/<namespace>.<account>/tls.key"
+  - proxy_id: "<namespace>.<account>.internal"
+    temporal_cloud:
+      namespace: "<namespace>.<account>"
+      host_port: "<namespace>.<account>.tmprl.cloud:7233" # endpoint when using mTLS
+      # host_port: "<region>.<cloud>.api.temporal.io:7233" # endpoint when using API keys
+      authentication:
+        # only set either tls or api_key
+        tls:
+          cert_file: "/path/to/<namespace>.<account>/tls.crt"
+          key_file: "/path/to/<namespace>.<account>/tls.key"
+        api_key: "ey..."
     encryption_key: "<key>"
-    namespace: "<namespace>.<account>"
     authentication:
       type: "spiffe"
       config:

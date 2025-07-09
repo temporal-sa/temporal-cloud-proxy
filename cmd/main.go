@@ -149,9 +149,9 @@ func configureProxy(proxyConns *proxy.Conn, cfg *utils.Config) error {
 		metricsHandler := metrics.NewMetricsHandler(metrics.MetricsHandlerOptions{
 			// Todo: do we need these many attributes?
 			InitialAttributes: attribute.NewSet(
-				attribute.String("proxy-id", t.ProxyId),
-				attribute.String("target", t.Target),
-				attribute.String("namespace", t.Namespace),
+				attribute.String("proxy_id", t.ProxyId),
+				attribute.String("namespace", t.TemporalCloud.Namespace),
+				attribute.String("host_port", t.TemporalCloud.HostPort),
 				attribute.String("auth_type", authType),
 				attribute.String("encryption_key", t.EncryptionKey),
 			),
@@ -172,12 +172,7 @@ func configureProxy(proxyConns *proxy.Conn, cfg *utils.Config) error {
 		}
 
 		err := proxyConns.AddConn(proxy.AddConnInput{
-			ProxyId:             t.ProxyId,
-			Target:              t.Target,
-			TLSCertPath:         t.TLS.CertFile,
-			TLSKeyPath:          t.TLS.KeyFile,
-			EncryptionKeyID:     t.EncryptionKey,
-			Namespace:           t.Namespace,
+			Target:              &t,
 			AuthManager:         authManager,
 			AuthType:            authType,
 			MetricsHandler:      metricsHandler,

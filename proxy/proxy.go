@@ -5,24 +5,22 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
-	"go.temporal.io/sdk/converter"
-	"os"
-	"sync"
-	"temporal-sa/temporal-cloud-proxy/codec"
-	"temporal-sa/temporal-cloud-proxy/crypto"
-
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/kms"
-
-	"temporal-sa/temporal-cloud-proxy/auth"
-	"temporal-sa/temporal-cloud-proxy/metrics"
-
+	"go.temporal.io/sdk/converter"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
+	"os"
+	"sync"
+	"temporal-sa/temporal-cloud-proxy/auth"
+	"temporal-sa/temporal-cloud-proxy/codec"
+	"temporal-sa/temporal-cloud-proxy/crypto"
+	"temporal-sa/temporal-cloud-proxy/metrics"
+	"temporal-sa/temporal-cloud-proxy/utils"
 )
 
 type Conn struct {
@@ -59,12 +57,7 @@ func createKMSClient() *kms.KMS {
 
 // AddConnInput contains parameters for adding a new connection
 type AddConnInput struct {
-	ProxyId             string
-	Target              string
-	TLSCertPath         string
-	TLSKeyPath          string
-	EncryptionKeyID     string
-	Namespace           string
+	Target              *utils.TargetConfig
 	AuthManager         *auth.AuthManager
 	AuthType            string
 	MetricsHandler      metrics.MetricsHandler
@@ -73,18 +66,19 @@ type AddConnInput struct {
 
 // AddConn adds a new connection to the proxy
 func (mc *Conn) AddConn(input AddConnInput) error {
-	fmt.Printf("Adding connection id: %s target: %s\n", input.ProxyId, input.Target)
+	fmt.Printf("Adding connection id: %s namespace: %s hostport: %s\n",
+		input.Target.ProxyId, input.Target.TemporalCloud.Namespace, input.Target.TemporalCloud.HostPort)
 
-	cert, err := tls.LoadX509KeyPair(input.TLSCertPath, input.TLSKeyPath)
-	if err != nil {
-		return err
+	if input.Target.TemporalCloud.Authentication.ApiKey != "" && input.Target.TemporalCloud.Authentication.TLS != nil {
+		return fmt.Errorf("%s: cannot have both api key and mtls authentication configured on a single target",
+			input.Target.ProxyId)
 	}
 
 	//Initialize AWS KMS client
 	kmsClient := createKMSClient()
 
 	codecContext := map[string]string{
-		"namespace": input.Namespace,
+		"namespace": input.Target.TemporalCloud.Namespace,
 	}
 
 	clientInterceptor, err := converter.NewPayloadCodecGRPCClientInterceptor(
@@ -92,7 +86,7 @@ func (mc *Conn) AddConn(input AddConnInput) error {
 			Codecs: []converter.PayloadCodec{codec.NewEncryptionCodecWithCaching(
 				kmsClient,
 				codecContext,
-				input.EncryptionKeyID,
+				input.Target.EncryptionKey,
 				input.MetricsHandler,
 				input.CryptoCachingConfig,
 			)},
@@ -102,21 +96,52 @@ func (mc *Conn) AddConn(input AddConnInput) error {
 		return err
 	}
 
+	tlsConfig := tls.Config{}
+
+	grpcInterceptors := []grpc.UnaryClientInterceptor{
+		clientInterceptor,
+	}
+
+	if input.Target.TemporalCloud.Authentication.ApiKey != "" {
+		grpcInterceptors = append(grpcInterceptors,
+			func(ctx context.Context, method string, req any, reply any, cc *grpc.ClientConn, invoker grpc.UnaryInvoker, opts ...grpc.CallOption) error {
+				md, ok := metadata.FromIncomingContext(ctx)
+
+				if ok {
+					md = md.Copy()
+					md.Delete("authorization")
+					md.Delete("temporal-namespace")
+
+					ctx = metadata.NewOutgoingContext(ctx, md)
+					ctx = metadata.AppendToOutgoingContext(ctx, "temporal-namespace", input.Target.TemporalCloud.Namespace)
+					ctx = metadata.AppendToOutgoingContext(ctx, "authorization", "Bearer "+input.Target.TemporalCloud.Authentication.ApiKey)
+				}
+
+				return invoker(ctx, method, req, reply, cc, opts...)
+			})
+	} else {
+		cert, err := tls.LoadX509KeyPair(input.Target.TemporalCloud.Authentication.TLS.CertFile,
+			input.Target.TemporalCloud.Authentication.TLS.KeyFile)
+		if err != nil {
+			return err
+		}
+
+		tlsConfig.Certificates = []tls.Certificate{cert}
+	}
+
 	conn, err := grpc.NewClient(
-		input.Target,
+		input.Target.TemporalCloud.HostPort,
 		grpc.WithTransportCredentials(credentials.NewTLS(
-			&tls.Config{
-				Certificates: []tls.Certificate{cert},
-			},
+			&tlsConfig,
 		)),
-		grpc.WithUnaryInterceptor(clientInterceptor),
+		grpc.WithChainUnaryInterceptor(grpcInterceptors...),
 	)
 	if err != nil {
 		return err
 	}
 
 	mc.mu.Lock()
-	mc.namespace[input.ProxyId] = NamespaceConn{
+	mc.namespace[input.Target.ProxyId] = NamespaceConn{
 		conn:        conn,
 		authManager: input.AuthManager,
 		authType:    input.AuthType,
@@ -137,8 +162,10 @@ func (mc *Conn) CloseAll() error {
 		if err := namespace.conn.Close(); err != nil {
 			errs = append(errs, err)
 		}
-		if err := namespace.authManager.Close(); err != nil {
-			errs = append(errs, err)
+		if namespace.authManager != nil {
+			if err := namespace.authManager.Close(); err != nil {
+				errs = append(errs, err)
+			}
 		}
 	}
 

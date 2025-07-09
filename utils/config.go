@@ -27,12 +27,21 @@ type CachingConfig struct {
 }
 
 type TargetConfig struct {
-	ProxyId        string      `yaml:"proxy_id"`
-	Target         string      `yaml:"target"`
-	TLS            TLSConfig   `yaml:"tls"`
-	EncryptionKey  string      `yaml:"encryption_key"`
-	Namespace      string      `yaml:"namespace"`
-	Authentication *AuthConfig `yaml:"authentication,omitempty"`
+	ProxyId        string              `yaml:"proxy_id"`
+	TemporalCloud  TemporalCloudConfig `yaml:"temporal_cloud"`
+	EncryptionKey  string              `yaml:"encryption_key"`
+	Authentication *AuthConfig         `yaml:"authentication,omitempty"`
+}
+
+type TemporalCloudConfig struct {
+	Namespace      string             `yaml:"namespace"`
+	HostPort       string             `yaml:"host_port"`
+	Authentication TemporalAuthConfig `yaml:"authentication"`
+}
+
+type TemporalAuthConfig struct {
+	TLS    *TLSConfig `yaml:"tls,omitempty"`
+	ApiKey string     `yaml:"api_key,omitempty"`
 }
 
 type TLSConfig struct {

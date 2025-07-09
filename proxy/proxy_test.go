@@ -17,6 +17,8 @@ import (
 	"time"
 
 	"temporal-sa/temporal-cloud-proxy/auth"
+	"temporal-sa/temporal-cloud-proxy/metrics"
+	"temporal-sa/temporal-cloud-proxy/utils"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -116,60 +118,123 @@ func TestConn_AddConn(t *testing.T) {
 		errorMsg    string
 	}{
 		{
-			name: "successful connection addition",
+			name: "successful connection addition with TLS",
 			input: AddConnInput{
-				ProxyId:         "test-proxy-id",
-				Target:          "localhost:7233",
-				TLSCertPath:     certPath,
-				TLSKeyPath:      keyPath,
-				EncryptionKeyID: "test-key-id",
-				Namespace:       "test-namespace",
-				AuthManager:     nil, // Use nil for simplicity in tests
-				AuthType:        "jwt",
+				Target: &utils.TargetConfig{
+					ProxyId: "test-proxy-id",
+					TemporalCloud: utils.TemporalCloudConfig{
+						Namespace: "test-namespace",
+						HostPort:  "localhost:7233",
+						Authentication: utils.TemporalAuthConfig{
+							TLS: &utils.TLSConfig{
+								CertFile: certPath,
+								KeyFile:  keyPath,
+							},
+						},
+					},
+					EncryptionKey: "test-key-id",
+				},
+				AuthManager:         nil, // Use nil for simplicity in tests
+				AuthType:            "jwt",
+				MetricsHandler:      metrics.NewMetricsHandler(metrics.MetricsHandlerOptions{}),
+				CryptoCachingConfig: nil,
+			},
+			expectError: false,
+		},
+		{
+			name: "successful connection addition with API key",
+			input: AddConnInput{
+				Target: &utils.TargetConfig{
+					ProxyId: "test-proxy-id-api",
+					TemporalCloud: utils.TemporalCloudConfig{
+						Namespace: "test-namespace",
+						HostPort:  "localhost:7233",
+						Authentication: utils.TemporalAuthConfig{
+							ApiKey: "test-api-key",
+						},
+					},
+					EncryptionKey: "test-key-id",
+				},
+				AuthManager:         nil,
+				AuthType:            "jwt",
+				MetricsHandler:      metrics.NewMetricsHandler(metrics.MetricsHandlerOptions{}),
+				CryptoCachingConfig: nil,
 			},
 			expectError: false,
 		},
 		{
 			name: "invalid certificate path",
 			input: AddConnInput{
-				ProxyId:         "test-proxy-id",
-				Target:          "localhost:7233",
-				TLSCertPath:     "/nonexistent/cert.pem",
-				TLSKeyPath:      keyPath,
-				EncryptionKeyID: "test-key-id",
-				Namespace:       "test-namespace",
-				AuthManager:     nil,
-				AuthType:        "jwt",
+				Target: &utils.TargetConfig{
+					ProxyId: "test-proxy-id",
+					TemporalCloud: utils.TemporalCloudConfig{
+						Namespace: "test-namespace",
+						HostPort:  "localhost:7233",
+						Authentication: utils.TemporalAuthConfig{
+							TLS: &utils.TLSConfig{
+								CertFile: "/nonexistent/cert.pem",
+								KeyFile:  keyPath,
+							},
+						},
+					},
+					EncryptionKey: "test-key-id",
+				},
+				AuthManager:         nil,
+				AuthType:            "jwt",
+				MetricsHandler:      metrics.NewMetricsHandler(metrics.MetricsHandlerOptions{}),
+				CryptoCachingConfig: nil,
 			},
 			expectError: true,
 		},
 		{
 			name: "invalid key path",
 			input: AddConnInput{
-				ProxyId:         "test-proxy-id",
-				Target:          "localhost:7233",
-				TLSCertPath:     certPath,
-				TLSKeyPath:      "/nonexistent/key.pem",
-				EncryptionKeyID: "test-key-id",
-				Namespace:       "test-namespace",
-				AuthManager:     nil,
-				AuthType:        "jwt",
+				Target: &utils.TargetConfig{
+					ProxyId: "test-proxy-id",
+					TemporalCloud: utils.TemporalCloudConfig{
+						Namespace: "test-namespace",
+						HostPort:  "localhost:7233",
+						Authentication: utils.TemporalAuthConfig{
+							TLS: &utils.TLSConfig{
+								CertFile: certPath,
+								KeyFile:  "/nonexistent/key.pem",
+							},
+						},
+					},
+					EncryptionKey: "test-key-id",
+				},
+				AuthManager:         nil,
+				AuthType:            "jwt",
+				MetricsHandler:      metrics.NewMetricsHandler(metrics.MetricsHandlerOptions{}),
+				CryptoCachingConfig: nil,
 			},
 			expectError: true,
 		},
 		{
-			name: "connection without auth manager",
+			name: "both API key and TLS configured - should error",
 			input: AddConnInput{
-				ProxyId:         "test-proxy-id-no-auth",
-				Target:          "localhost:7233",
-				TLSCertPath:     certPath,
-				TLSKeyPath:      keyPath,
-				EncryptionKeyID: "test-key-id",
-				Namespace:       "test-namespace",
-				AuthManager:     nil,
-				AuthType:        "",
+				Target: &utils.TargetConfig{
+					ProxyId: "test-proxy-id",
+					TemporalCloud: utils.TemporalCloudConfig{
+						Namespace: "test-namespace",
+						HostPort:  "localhost:7233",
+						Authentication: utils.TemporalAuthConfig{
+							ApiKey: "test-api-key",
+							TLS: &utils.TLSConfig{
+								CertFile: certPath,
+								KeyFile:  keyPath,
+							},
+						},
+					},
+					EncryptionKey: "test-key-id",
+				},
+				AuthManager:         nil,
+				AuthType:            "jwt",
+				MetricsHandler:      metrics.NewMetricsHandler(metrics.MetricsHandlerOptions{}),
+				CryptoCachingConfig: nil,
 			},
-			expectError: false,
+			expectError: true,
+			errorMsg:    "cannot have both api key and mtls authentication",
 		},
 	}
 
@@ -188,7 +253,7 @@ func TestConn_AddConn(t *testing.T) {
 				assert.Equal(t, 1, len(conn.namespace))
 
 				// Verify the connection was stored correctly
-				nsConn, exists := conn.namespace[tt.input.ProxyId]
+				nsConn, exists := conn.namespace[tt.input.Target.ProxyId]
 				assert.True(t, exists)
 				assert.NotNil(t, nsConn.conn)
 				assert.Equal(t, tt.input.AuthManager, nsConn.authManager)
@@ -430,14 +495,24 @@ func TestConn_ConcurrentAccess(t *testing.T) {
 			defer wg.Done()
 
 			input := AddConnInput{
-				ProxyId:         fmt.Sprintf("proxy-id-%d", id),
-				Target:          "localhost:7233",
-				TLSCertPath:     certPath,
-				TLSKeyPath:      keyPath,
-				EncryptionKeyID: "test-key-id",
-				Namespace:       fmt.Sprintf("namespace-%d", id),
-				AuthManager:     nil,
-				AuthType:        "jwt",
+				Target: &utils.TargetConfig{
+					ProxyId: fmt.Sprintf("proxy-id-%d", id),
+					TemporalCloud: utils.TemporalCloudConfig{
+						Namespace: fmt.Sprintf("namespace-%d", id),
+						HostPort:  "localhost:7233",
+						Authentication: utils.TemporalAuthConfig{
+							TLS: &utils.TLSConfig{
+								CertFile: certPath,
+								KeyFile:  keyPath,
+							},
+						},
+					},
+					EncryptionKey: "test-key-id",
+				},
+				AuthManager:         nil,
+				AuthType:            "jwt",
+				MetricsHandler:      metrics.NewMetricsHandler(metrics.MetricsHandlerOptions{}),
+				CryptoCachingConfig: nil,
 			}
 
 			err := conn.AddConn(input)
