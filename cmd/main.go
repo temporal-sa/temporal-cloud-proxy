@@ -110,22 +110,22 @@ func main() {
 func configureProxy(proxyConns *proxy.Conn, cfg *utils.Config) error {
 	ctx := context.TODO()
 
-	for _, t := range cfg.Targets {
+	for _, w := range cfg.Workloads {
 		var authManager *auth.AuthManager
 		var authType string
 
-		if t.Authentication != nil {
+		if w.Authentication != nil {
 			authManager = auth.NewAuthManager()
-			authType = t.Authentication.Type
+			authType = w.Authentication.Type
 
 			switch authType {
 			case "spiffe":
 				spiffeAuth := &auth.SpiffeAuthenticator{
-					TrustDomain: t.Authentication.Config["trust_domain"].(string),
-					Endpoint:    t.Authentication.Config["endpoint"].(string),
+					TrustDomain: w.Authentication.Config["trust_domain"].(string),
+					Endpoint:    w.Authentication.Config["endpoint"].(string),
 				}
 
-				if audiences, ok := t.Authentication.Config["audiences"].([]interface{}); ok {
+				if audiences, ok := w.Authentication.Config["audiences"].([]interface{}); ok {
 					for _, a := range audiences {
 						if audience, ok := a.(string); ok {
 							spiffeAuth.Audiences = append(spiffeAuth.Audiences, audience)
@@ -133,7 +133,7 @@ func configureProxy(proxyConns *proxy.Conn, cfg *utils.Config) error {
 					}
 				}
 
-				if err := spiffeAuth.Init(ctx, t.Authentication.Config); err != nil {
+				if err := spiffeAuth.Init(ctx, w.Authentication.Config); err != nil {
 					return fmt.Errorf("failed to initialize spiffe authenticator: %w", err)
 				}
 
@@ -149,11 +149,11 @@ func configureProxy(proxyConns *proxy.Conn, cfg *utils.Config) error {
 		metricsHandler := metrics.NewMetricsHandler(metrics.MetricsHandlerOptions{
 			// Todo: do we need these many attributes?
 			InitialAttributes: attribute.NewSet(
-				attribute.String("proxy-id", t.ProxyId),
-				attribute.String("target", t.Target),
-				attribute.String("namespace", t.Namespace),
+				attribute.String("workload_id", w.WorkloadId),
+				attribute.String("namespace", w.TemporalCloud.Namespace),
+				attribute.String("host_port", w.TemporalCloud.HostPort),
 				attribute.String("auth_type", authType),
-				attribute.String("encryption_key", t.EncryptionKey),
+				attribute.String("encryption_key", w.EncryptionKey),
 			),
 		})
 
@@ -172,12 +172,7 @@ func configureProxy(proxyConns *proxy.Conn, cfg *utils.Config) error {
 		}
 
 		err := proxyConns.AddConn(proxy.AddConnInput{
-			ProxyId:             t.ProxyId,
-			Target:              t.Target,
-			TLSCertPath:         t.TLS.CertFile,
-			TLSKeyPath:          t.TLS.KeyFile,
-			EncryptionKeyID:     t.EncryptionKey,
-			Namespace:           t.Namespace,
+			Workload:            &w,
 			AuthManager:         authManager,
 			AuthType:            authType,
 			MetricsHandler:      metricsHandler,

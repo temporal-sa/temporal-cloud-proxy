@@ -5,7 +5,7 @@ OUTPUT_PATH := $(OUTPUT_DIR)/$(BINARY_NAME)
 
 .PHONY: all build clean test test-verbose test-coverage test-race test-short test-clean benchmark test-auth test-crypto test-proxy test-utils
 
-all: build
+all: test build
 
 build:
 	go build -o $(OUTPUT_PATH) $(CMD_DIR)

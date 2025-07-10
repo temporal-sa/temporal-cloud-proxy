@@ -17,6 +17,8 @@ import (
 	"time"
 
 	"temporal-sa/temporal-cloud-proxy/auth"
+	"temporal-sa/temporal-cloud-proxy/metrics"
+	"temporal-sa/temporal-cloud-proxy/utils"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -116,60 +118,150 @@ func TestConn_AddConn(t *testing.T) {
 		errorMsg    string
 	}{
 		{
-			name: "successful connection addition",
+			name: "successful connection addition with TLS",
 			input: AddConnInput{
-				ProxyId:         "test-proxy-id",
-				Target:          "localhost:7233",
-				TLSCertPath:     certPath,
-				TLSKeyPath:      keyPath,
-				EncryptionKeyID: "test-key-id",
-				Namespace:       "test-namespace",
-				AuthManager:     nil, // Use nil for simplicity in tests
-				AuthType:        "jwt",
+				Workload: &utils.WorkloadConfig{
+					WorkloadId: "test-workload-id",
+					TemporalCloud: utils.TemporalCloudConfig{
+						Namespace: "test-namespace",
+						HostPort:  "localhost:7233",
+						Authentication: utils.TemporalAuthConfig{
+							TLS: &utils.TLSConfig{
+								CertFile: certPath,
+								KeyFile:  keyPath,
+							},
+						},
+					},
+					EncryptionKey: "test-key-id",
+				},
+				AuthManager:         nil, // Use nil for simplicity in tests
+				AuthType:            "jwt",
+				MetricsHandler:      metrics.NewMetricsHandler(metrics.MetricsHandlerOptions{}),
+				CryptoCachingConfig: nil,
 			},
 			expectError: false,
 		},
 		{
+			name: "successful connection addition with API key (value)",
+			input: AddConnInput{
+				Workload: &utils.WorkloadConfig{
+					WorkloadId: "test-workload-id-api",
+					TemporalCloud: utils.TemporalCloudConfig{
+						Namespace: "test-namespace",
+						HostPort:  "localhost:7233",
+						Authentication: utils.TemporalAuthConfig{
+							ApiKey: &utils.TemporalApiKeyConfig{
+								Value: "test-api-key",
+							},
+						},
+					},
+					EncryptionKey: "test-key-id",
+				},
+				AuthManager:         nil,
+				AuthType:            "jwt",
+				MetricsHandler:      metrics.NewMetricsHandler(metrics.MetricsHandlerOptions{}),
+				CryptoCachingConfig: nil,
+			},
+			expectError: false,
+		},
+		{
+			name: "successful connection addition with API key (env var)",
+			input: AddConnInput{
+				Workload: &utils.WorkloadConfig{
+					WorkloadId: "test-workload-id-api-env",
+					TemporalCloud: utils.TemporalCloudConfig{
+						Namespace: "test-namespace",
+						HostPort:  "localhost:7233",
+						Authentication: utils.TemporalAuthConfig{
+							ApiKey: &utils.TemporalApiKeyConfig{
+								EnvVar: "TEST_TEMPORAL_API_KEY",
+							},
+						},
+					},
+					EncryptionKey: "test-key-id",
+				},
+				AuthManager:         nil,
+				AuthType:            "jwt",
+				MetricsHandler:      metrics.NewMetricsHandler(metrics.MetricsHandlerOptions{}),
+				CryptoCachingConfig: nil,
+			},
+			expectError: true, // Will fail because env var is not set
+		},
+		{
 			name: "invalid certificate path",
 			input: AddConnInput{
-				ProxyId:         "test-proxy-id",
-				Target:          "localhost:7233",
-				TLSCertPath:     "/nonexistent/cert.pem",
-				TLSKeyPath:      keyPath,
-				EncryptionKeyID: "test-key-id",
-				Namespace:       "test-namespace",
-				AuthManager:     nil,
-				AuthType:        "jwt",
+				Workload: &utils.WorkloadConfig{
+					WorkloadId: "test-workload-id",
+					TemporalCloud: utils.TemporalCloudConfig{
+						Namespace: "test-namespace",
+						HostPort:  "localhost:7233",
+						Authentication: utils.TemporalAuthConfig{
+							TLS: &utils.TLSConfig{
+								CertFile: "/nonexistent/cert.pem",
+								KeyFile:  keyPath,
+							},
+						},
+					},
+					EncryptionKey: "test-key-id",
+				},
+				AuthManager:         nil,
+				AuthType:            "jwt",
+				MetricsHandler:      metrics.NewMetricsHandler(metrics.MetricsHandlerOptions{}),
+				CryptoCachingConfig: nil,
 			},
 			expectError: true,
 		},
 		{
 			name: "invalid key path",
 			input: AddConnInput{
-				ProxyId:         "test-proxy-id",
-				Target:          "localhost:7233",
-				TLSCertPath:     certPath,
-				TLSKeyPath:      "/nonexistent/key.pem",
-				EncryptionKeyID: "test-key-id",
-				Namespace:       "test-namespace",
-				AuthManager:     nil,
-				AuthType:        "jwt",
+				Workload: &utils.WorkloadConfig{
+					WorkloadId: "test-workload-id",
+					TemporalCloud: utils.TemporalCloudConfig{
+						Namespace: "test-namespace",
+						HostPort:  "localhost:7233",
+						Authentication: utils.TemporalAuthConfig{
+							TLS: &utils.TLSConfig{
+								CertFile: certPath,
+								KeyFile:  "/nonexistent/key.pem",
+							},
+						},
+					},
+					EncryptionKey: "test-key-id",
+				},
+				AuthManager:         nil,
+				AuthType:            "jwt",
+				MetricsHandler:      metrics.NewMetricsHandler(metrics.MetricsHandlerOptions{}),
+				CryptoCachingConfig: nil,
 			},
 			expectError: true,
 		},
 		{
-			name: "connection without auth manager",
+			name: "both API key and TLS configured - should error",
 			input: AddConnInput{
-				ProxyId:         "test-proxy-id-no-auth",
-				Target:          "localhost:7233",
-				TLSCertPath:     certPath,
-				TLSKeyPath:      keyPath,
-				EncryptionKeyID: "test-key-id",
-				Namespace:       "test-namespace",
-				AuthManager:     nil,
-				AuthType:        "",
+				Workload: &utils.WorkloadConfig{
+					WorkloadId: "test-workload-id",
+					TemporalCloud: utils.TemporalCloudConfig{
+						Namespace: "test-namespace",
+						HostPort:  "localhost:7233",
+						Authentication: utils.TemporalAuthConfig{
+							ApiKey: &utils.TemporalApiKeyConfig{
+								Value: "test-api-key",
+							},
+							TLS: &utils.TLSConfig{
+								CertFile: certPath,
+								KeyFile:  keyPath,
+							},
+						},
+					},
+					EncryptionKey: "test-key-id",
+				},
+				AuthManager:         nil,
+				AuthType:            "jwt",
+				MetricsHandler:      metrics.NewMetricsHandler(metrics.MetricsHandlerOptions{}),
+				CryptoCachingConfig: nil,
 			},
-			expectError: false,
+			expectError: true,
+			errorMsg:    "cannot have both api key and mtls authentication",
 		},
 	}
 
@@ -188,7 +280,7 @@ func TestConn_AddConn(t *testing.T) {
 				assert.Equal(t, 1, len(conn.namespace))
 
 				// Verify the connection was stored correctly
-				nsConn, exists := conn.namespace[tt.input.ProxyId]
+				nsConn, exists := conn.namespace[tt.input.Workload.WorkloadId]
 				assert.True(t, exists)
 				assert.NotNil(t, nsConn.conn)
 				assert.Equal(t, tt.input.AuthManager, nsConn.authManager)
@@ -229,7 +321,7 @@ func TestConn_Invoke(t *testing.T) {
 			expectedCode: codes.InvalidArgument,
 		},
 		{
-			name: "missing proxy-id",
+			name: "missing workload-id",
 			setupContext: func() context.Context {
 				md := metadata.New(map[string]string{})
 				return metadata.NewIncomingContext(context.Background(), md)
@@ -240,14 +332,14 @@ func TestConn_Invoke(t *testing.T) {
 			method:        "/test.Service/Method",
 			expectError:   true,
 			expectedCode:  codes.InvalidArgument,
-			errorContains: "metadata missing proxy-id",
+			errorContains: "metadata missing workload-id",
 		},
 		{
-			name: "multiple proxy-id entries",
+			name: "multiple workload-id entries",
 			setupContext: func() context.Context {
 				md := metadata.New(map[string]string{})
-				md.Append("proxy-id", "proxy-id-1")
-				md.Append("proxy-id", "proxy-id-2")
+				md.Append("workload-id", "workload-id-1")
+				md.Append("workload-id", "workload-id-2")
 				return metadata.NewIncomingContext(context.Background(), md)
 			},
 			setupConn: func() *Conn {
@@ -256,13 +348,13 @@ func TestConn_Invoke(t *testing.T) {
 			method:        "/test.Service/Method",
 			expectError:   true,
 			expectedCode:  codes.InvalidArgument,
-			errorContains: "multiple proxy-id entries",
+			errorContains: "multiple workload-id entries",
 		},
 		{
-			name: "target not found",
+			name: "workload not found",
 			setupContext: func() context.Context {
 				md := metadata.New(map[string]string{
-					"proxy-id": "nonexistent-proxy-id",
+					"workload-id": "nonexistent-workload-id",
 				})
 				return metadata.NewIncomingContext(context.Background(), md)
 			},
@@ -272,19 +364,19 @@ func TestConn_Invoke(t *testing.T) {
 			method:        "/test.Service/Method",
 			expectError:   true,
 			expectedCode:  codes.InvalidArgument,
-			errorContains: "invalid proxy-id: nonexistent-proxy-id",
+			errorContains: "invalid workload-id: nonexistent-workload-id",
 		},
 		{
 			name: "invoke without authentication - skips auth logic",
 			setupContext: func() context.Context {
 				md := metadata.New(map[string]string{
-					"proxy-id": "test-proxy-id-no-auth",
+					"workload-id": "test-workload-id-no-auth",
 				})
 				return metadata.NewIncomingContext(context.Background(), md)
 			},
 			setupConn: func() *Conn {
 				conn := NewConn()
-				// Don't add any namespace connections to test the "target not found" path
+				// Don't add any namespace connections to test the "workload not found" path
 				// This way we can test the logic without hitting the nil pointer
 				return conn
 			},
@@ -293,13 +385,13 @@ func TestConn_Invoke(t *testing.T) {
 			reply:         struct{}{},
 			expectError:   true,
 			expectedCode:  codes.InvalidArgument,
-			errorContains: "invalid proxy-id: test-proxy-id-no-auth",
+			errorContains: "invalid workload-id: test-workload-id-no-auth",
 		},
 		{
 			name: "missing authorization with auth manager",
 			setupContext: func() context.Context {
 				md := metadata.New(map[string]string{
-					"proxy-id": "test-proxy-id",
+					"workload-id": "test-workload-id",
 				})
 				return metadata.NewIncomingContext(context.Background(), md)
 			},
@@ -308,7 +400,7 @@ func TestConn_Invoke(t *testing.T) {
 				// Create a real auth manager for testing
 				authManager := auth.NewAuthManager()
 
-				conn.namespace["test-proxy-id"] = NamespaceConn{
+				conn.namespace["test-workload-id"] = NamespaceConn{
 					conn:        nil,
 					authManager: authManager,
 					authType:    "jwt",
@@ -324,7 +416,7 @@ func TestConn_Invoke(t *testing.T) {
 			name: "multiple authorization entries",
 			setupContext: func() context.Context {
 				md := metadata.New(map[string]string{
-					"proxy-id": "test-proxy-id",
+					"workload-id": "test-workload-id",
 				})
 				md.Append("authorization", "Bearer token1")
 				md.Append("authorization", "Bearer token2")
@@ -335,7 +427,7 @@ func TestConn_Invoke(t *testing.T) {
 				// Create a real auth manager for testing
 				authManager := auth.NewAuthManager()
 
-				conn.namespace["test-proxy-id"] = NamespaceConn{
+				conn.namespace["test-workload-id"] = NamespaceConn{
 					conn:        nil,
 					authManager: authManager,
 					authType:    "jwt",
@@ -430,14 +522,24 @@ func TestConn_ConcurrentAccess(t *testing.T) {
 			defer wg.Done()
 
 			input := AddConnInput{
-				ProxyId:         fmt.Sprintf("proxy-id-%d", id),
-				Target:          "localhost:7233",
-				TLSCertPath:     certPath,
-				TLSKeyPath:      keyPath,
-				EncryptionKeyID: "test-key-id",
-				Namespace:       fmt.Sprintf("namespace-%d", id),
-				AuthManager:     nil,
-				AuthType:        "jwt",
+				Workload: &utils.WorkloadConfig{
+					WorkloadId: fmt.Sprintf("workload-id-%d", id),
+					TemporalCloud: utils.TemporalCloudConfig{
+						Namespace: fmt.Sprintf("namespace-%d", id),
+						HostPort:  "localhost:7233",
+						Authentication: utils.TemporalAuthConfig{
+							TLS: &utils.TLSConfig{
+								CertFile: certPath,
+								KeyFile:  keyPath,
+							},
+						},
+					},
+					EncryptionKey: "test-key-id",
+				},
+				AuthManager:         nil,
+				AuthType:            "jwt",
+				MetricsHandler:      metrics.NewMetricsHandler(metrics.MetricsHandlerOptions{}),
+				CryptoCachingConfig: nil,
 			}
 
 			err := conn.AddConn(input)
@@ -458,9 +560,9 @@ func TestConn_ConcurrentAccess(t *testing.T) {
 		go func(id int) {
 			defer wg.Done()
 
-			proxyId := id % numConnections
+			workloadId := id % numConnections
 			md := metadata.New(map[string]string{
-				"proxy-id": fmt.Sprintf("proxy-id-%d", proxyId),
+				"workload-id": fmt.Sprintf("workload-id-%d", workloadId),
 			})
 			ctx := metadata.NewIncomingContext(context.Background(), md)
 
@@ -508,7 +610,7 @@ func TestConn_InvokeWithAuthentication(t *testing.T) {
 			name: "missing authorization header",
 			setupContext: func() context.Context {
 				md := metadata.New(map[string]string{
-					"proxy-id": "test-proxy-id",
+					"workload-id": "test-workload-id",
 				})
 				return metadata.NewIncomingContext(context.Background(), md)
 			},
@@ -519,7 +621,7 @@ func TestConn_InvokeWithAuthentication(t *testing.T) {
 	}
 
 	// Add a namespace with auth manager (using nil since we can't easily mock the interface)
-	conn.namespace["test-proxy-id"] = NamespaceConn{
+	conn.namespace["test-workload-id"] = NamespaceConn{
 		conn:        nil, // Will cause failure, but we're testing auth logic first
 		authManager: nil, // We'll set this to non-nil to trigger auth checks
 		authType:    "jwt",
@@ -528,9 +630,9 @@ func TestConn_InvokeWithAuthentication(t *testing.T) {
 	// Set authManager to non-nil to trigger the auth logic
 	// Use a real auth manager since we can't easily mock the interface
 	authManager := auth.NewAuthManager()
-	nsConn := conn.namespace["test-proxy-id"]
+	nsConn := conn.namespace["test-workload-id"]
 	nsConn.authManager = authManager
-	conn.namespace["test-proxy-id"] = nsConn
+	conn.namespace["test-workload-id"] = nsConn
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

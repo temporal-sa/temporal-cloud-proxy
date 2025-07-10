@@ -14,19 +14,28 @@ func TestConfig_UnmarshalYAML(t *testing.T) {
 		wantErr  bool
 	}{
 		{
-			name: "valid complete config",
+			name: "valid complete config with TLS authentication",
 			yamlData: `
 server:
   port: 7233
   host: "0.0.0.0"
-targets:
-  - proxy_id: "test.namespace.internal"
-    target: "test.namespace.tmprl.cloud:7233"
-    tls:
-      cert_file: "/path/to/cert.crt"
-      key_file: "/path/to/key.key"
+metrics:
+  port: 8080
+encryption:
+  caching:
+    max_cache: 100
+    max_age: "1h"
+    max_usage: 1000
+workloads:
+  - workload_id: "test.namespace.internal"
+    temporal_cloud:
+      namespace: "test.namespace"
+      host_port: "test.namespace.tmprl.cloud:7233"
+      authentication:
+        tls:
+          cert_file: "/path/to/cert.crt"
+          key_file: "/path/to/key.key"
     encryption_key: "test-key"
-    namespace: "test.namespace"
     authentication:
       type: "spiffe"
       config:
@@ -40,16 +49,30 @@ targets:
 					Port: 7233,
 					Host: "0.0.0.0",
 				},
-				Targets: []TargetConfig{
+				Metrics: MetricsConfig{
+					Port: 8080,
+				},
+				Encryption: EncryptionConfig{
+					Caching: CachingConfig{
+						MaxCache: 100,
+						MaxAge:   "1h",
+						MaxUsage: 1000,
+					},
+				},
+				Workloads: []WorkloadConfig{
 					{
-						ProxyId:       "test.namespace.internal",
-						Target:        "test.namespace.tmprl.cloud:7233",
-						EncryptionKey: "test-key",
-						Namespace:     "test.namespace",
-						TLS: TLSConfig{
-							CertFile: "/path/to/cert.crt",
-							KeyFile:  "/path/to/key.key",
+						WorkloadId: "test.namespace.internal",
+						TemporalCloud: TemporalCloudConfig{
+							Namespace: "test.namespace",
+							HostPort:  "test.namespace.tmprl.cloud:7233",
+							Authentication: TemporalAuthConfig{
+								TLS: &TLSConfig{
+									CertFile: "/path/to/cert.crt",
+									KeyFile:  "/path/to/key.key",
+								},
+							},
 						},
+						EncryptionKey: "test-key",
 						Authentication: &AuthConfig{
 							Type: "spiffe",
 							Config: map[string]interface{}{
@@ -64,35 +87,47 @@ targets:
 			wantErr: false,
 		},
 		{
-			name: "minimal config without authentication",
+			name: "valid config with API key authentication (value)",
 			yamlData: `
 server:
   port: 8080
   host: "localhost"
-targets:
-  - proxy_id: "simple.internal"
-    target: "simple.external:8080"
-    tls:
-      cert_file: "/cert.crt"
-      key_file: "/key.key"
+metrics:
+  port: 9090
+workloads:
+  - workload_id: "simple.internal"
+    temporal_cloud:
+      namespace: "simple"
+      host_port: "simple.external:8080"
+      authentication:
+        api_key:
+          value: "your-api-key-here"
     encryption_key: "simple-key"
-    namespace: "simple"
 `,
 			want: Config{
 				Server: ServerConfig{
 					Port: 8080,
 					Host: "localhost",
 				},
-				Targets: []TargetConfig{
+				Metrics: MetricsConfig{
+					Port: 9090,
+				},
+				Encryption: EncryptionConfig{
+					Caching: CachingConfig{},
+				},
+				Workloads: []WorkloadConfig{
 					{
-						ProxyId:       "simple.internal",
-						Target:        "simple.external:8080",
-						EncryptionKey: "simple-key",
-						Namespace:     "simple",
-						TLS: TLSConfig{
-							CertFile: "/cert.crt",
-							KeyFile:  "/key.key",
+						WorkloadId: "simple.internal",
+						TemporalCloud: TemporalCloudConfig{
+							Namespace: "simple",
+							HostPort:  "simple.external:8080",
+							Authentication: TemporalAuthConfig{
+								ApiKey: &TemporalApiKeyConfig{
+									Value: "your-api-key-here",
+								},
+							},
 						},
+						EncryptionKey:  "simple-key",
 						Authentication: nil,
 					},
 				},
@@ -100,26 +135,82 @@ targets:
 			wantErr: false,
 		},
 		{
-			name: "multiple targets",
+			name: "valid config with API key authentication (env var)",
+			yamlData: `
+server:
+  port: 8080
+  host: "localhost"
+metrics:
+  port: 9090
+workloads:
+  - workload_id: "simple.internal"
+    temporal_cloud:
+      namespace: "simple"
+      host_port: "simple.external:8080"
+      authentication:
+        api_key:
+          env: "TEMPORAL_API_KEY"
+    encryption_key: "simple-key"
+`,
+			want: Config{
+				Server: ServerConfig{
+					Port: 8080,
+					Host: "localhost",
+				},
+				Metrics: MetricsConfig{
+					Port: 9090,
+				},
+				Encryption: EncryptionConfig{
+					Caching: CachingConfig{},
+				},
+				Workloads: []WorkloadConfig{
+					{
+						WorkloadId: "simple.internal",
+						TemporalCloud: TemporalCloudConfig{
+							Namespace: "simple",
+							HostPort:  "simple.external:8080",
+							Authentication: TemporalAuthConfig{
+								ApiKey: &TemporalApiKeyConfig{
+									EnvVar: "TEMPORAL_API_KEY",
+								},
+							},
+						},
+						EncryptionKey:  "simple-key",
+						Authentication: nil,
+					},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "multiple workloads with mixed authentication",
 			yamlData: `
 server:
   port: 9090
   host: "127.0.0.1"
-targets:
-  - proxy_id: "target1.internal"
-    target: "target1.external:9090"
-    tls:
-      cert_file: "/target1.crt"
-      key_file: "/target1.key"
+metrics:
+  port: 8081
+encryption:
+  caching:
+    max_cache: 50
+workloads:
+  - workload_id: "workload1.internal"
+    temporal_cloud:
+      namespace: "namespace1"
+      host_port: "workload1.external:9090"
+      authentication:
+        tls:
+          cert_file: "/workload1.crt"
+          key_file: "/workload1.key"
     encryption_key: "key1"
-    namespace: "namespace1"
-  - proxy_id: "target2.internal"
-    target: "target2.external:9091"
-    tls:
-      cert_file: "/target2.crt"
-      key_file: "/target2.key"
+  - workload_id: "workload2.internal"
+    temporal_cloud:
+      namespace: "namespace2"
+      host_port: "workload2.external:9091"
+      authentication:
+        api_key:
+          value: "workload2-api-key"
     encryption_key: "key2"
-    namespace: "namespace2"
     authentication:
       type: "oauth"
       config:
@@ -131,27 +222,42 @@ targets:
 					Port: 9090,
 					Host: "127.0.0.1",
 				},
-				Targets: []TargetConfig{
+				Metrics: MetricsConfig{
+					Port: 8081,
+				},
+				Encryption: EncryptionConfig{
+					Caching: CachingConfig{
+						MaxCache: 50,
+					},
+				},
+				Workloads: []WorkloadConfig{
 					{
-						ProxyId:       "target1.internal",
-						Target:        "target1.external:9090",
-						EncryptionKey: "key1",
-						Namespace:     "namespace1",
-						TLS: TLSConfig{
-							CertFile: "/target1.crt",
-							KeyFile:  "/target1.key",
+						WorkloadId: "workload1.internal",
+						TemporalCloud: TemporalCloudConfig{
+							Namespace: "namespace1",
+							HostPort:  "workload1.external:9090",
+							Authentication: TemporalAuthConfig{
+								TLS: &TLSConfig{
+									CertFile: "/workload1.crt",
+									KeyFile:  "/workload1.key",
+								},
+							},
 						},
+						EncryptionKey:  "key1",
 						Authentication: nil,
 					},
 					{
-						ProxyId:       "target2.internal",
-						Target:        "target2.external:9091",
-						EncryptionKey: "key2",
-						Namespace:     "namespace2",
-						TLS: TLSConfig{
-							CertFile: "/target2.crt",
-							KeyFile:  "/target2.key",
+						WorkloadId: "workload2.internal",
+						TemporalCloud: TemporalCloudConfig{
+							Namespace: "namespace2",
+							HostPort:  "workload2.external:9091",
+							Authentication: TemporalAuthConfig{
+								ApiKey: &TemporalApiKeyConfig{
+									Value: "workload2-api-key",
+								},
+							},
 						},
+						EncryptionKey: "key2",
 						Authentication: &AuthConfig{
 							Type: "oauth",
 							Config: map[string]interface{}{
@@ -242,16 +348,20 @@ func TestServerConfig_Validation(t *testing.T) {
 	}
 }
 
-func TestTargetConfig_Structure(t *testing.T) {
-	target := TargetConfig{
-		ProxyId:       "test.internal",
-		Target:        "test.external:7233",
-		EncryptionKey: "test-key",
-		Namespace:     "test-namespace",
-		TLS: TLSConfig{
-			CertFile: "/path/to/cert.crt",
-			KeyFile:  "/path/to/key.key",
+func TestWorkloadConfig_Structure(t *testing.T) {
+	workload := WorkloadConfig{
+		WorkloadId: "test.internal",
+		TemporalCloud: TemporalCloudConfig{
+			Namespace: "test-namespace",
+			HostPort:  "test.external:7233",
+			Authentication: TemporalAuthConfig{
+				TLS: &TLSConfig{
+					CertFile: "/path/to/cert.crt",
+					KeyFile:  "/path/to/key.key",
+				},
+			},
 		},
+		EncryptionKey: "test-key",
 		Authentication: &AuthConfig{
 			Type: "spiffe",
 			Config: map[string]interface{}{
@@ -260,31 +370,31 @@ func TestTargetConfig_Structure(t *testing.T) {
 		},
 	}
 
-	if target.ProxyId != "test.internal" {
-		t.Errorf("Expected ProxyId to be 'test.internal', got %s", target.ProxyId)
+	if workload.WorkloadId != "test.internal" {
+		t.Errorf("Expected WorkloadId to be 'test.internal', got %s", workload.WorkloadId)
 	}
-	if target.Target != "test.external:7233" {
-		t.Errorf("Expected Target to be 'test.external:7233', got %s", target.Target)
+	if workload.TemporalCloud.HostPort != "test.external:7233" {
+		t.Errorf("Expected TemporalCloud.HostPort to be 'test.external:7233', got %s", workload.TemporalCloud.HostPort)
 	}
-	if target.EncryptionKey != "test-key" {
-		t.Errorf("Expected EncryptionKey to be 'test-key', got %s", target.EncryptionKey)
+	if workload.EncryptionKey != "test-key" {
+		t.Errorf("Expected EncryptionKey to be 'test-key', got %s", workload.EncryptionKey)
 	}
-	if target.Namespace != "test-namespace" {
-		t.Errorf("Expected Namespace to be 'test-namespace', got %s", target.Namespace)
+	if workload.TemporalCloud.Namespace != "test-namespace" {
+		t.Errorf("Expected TemporalCloud.Namespace to be 'test-namespace', got %s", workload.TemporalCloud.Namespace)
 	}
-	if target.TLS.CertFile != "/path/to/cert.crt" {
-		t.Errorf("Expected TLS.CertFile to be '/path/to/cert.crt', got %s", target.TLS.CertFile)
+	if workload.TemporalCloud.Authentication.TLS.CertFile != "/path/to/cert.crt" {
+		t.Errorf("Expected TemporalCloud.Authentication.TLS.CertFile to be '/path/to/cert.crt', got %s", workload.TemporalCloud.Authentication.TLS.CertFile)
 	}
-	if target.TLS.KeyFile != "/path/to/key.key" {
-		t.Errorf("Expected TLS.KeyFile to be '/path/to/key.key', got %s", target.TLS.KeyFile)
+	if workload.TemporalCloud.Authentication.TLS.KeyFile != "/path/to/key.key" {
+		t.Errorf("Expected TemporalCloud.Authentication.TLS.KeyFile to be '/path/to/key.key', got %s", workload.TemporalCloud.Authentication.TLS.KeyFile)
 	}
-	if target.Authentication == nil {
+	if workload.Authentication == nil {
 		t.Error("Expected Authentication to not be nil")
 	} else {
-		if target.Authentication.Type != "spiffe" {
-			t.Errorf("Expected Authentication.Type to be 'spiffe', got %s", target.Authentication.Type)
+		if workload.Authentication.Type != "spiffe" {
+			t.Errorf("Expected Authentication.Type to be 'spiffe', got %s", workload.Authentication.Type)
 		}
-		if trustDomain, ok := target.Authentication.Config["trust_domain"]; !ok || trustDomain != "spiffe://example.org/" {
+		if trustDomain, ok := workload.Authentication.Config["trust_domain"]; !ok || trustDomain != "spiffe://example.org/" {
 			t.Errorf("Expected trust_domain to be 'spiffe://example.org/', got %v", trustDomain)
 		}
 	}
@@ -342,19 +452,200 @@ func TestAuthConfig_Types(t *testing.T) {
 	}
 }
 
+func TestMetricsConfig_Structure(t *testing.T) {
+	tests := []struct {
+		name   string
+		config MetricsConfig
+		want   int
+	}{
+		{
+			name:   "default metrics port",
+			config: MetricsConfig{Port: 8080},
+			want:   8080,
+		},
+		{
+			name:   "custom metrics port",
+			config: MetricsConfig{Port: 9090},
+			want:   9090,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.config.Port != tt.want {
+				t.Errorf("Expected Port to be %d, got %d", tt.want, tt.config.Port)
+			}
+		})
+	}
+}
+
+func TestEncryptionConfig_Structure(t *testing.T) {
+	tests := []struct {
+		name   string
+		config EncryptionConfig
+		want   CachingConfig
+	}{
+		{
+			name: "full caching config",
+			config: EncryptionConfig{
+				Caching: CachingConfig{
+					MaxCache: 100,
+					MaxAge:   "1h",
+					MaxUsage: 1000,
+				},
+			},
+			want: CachingConfig{
+				MaxCache: 100,
+				MaxAge:   "1h",
+				MaxUsage: 1000,
+			},
+		},
+		{
+			name: "partial caching config",
+			config: EncryptionConfig{
+				Caching: CachingConfig{
+					MaxCache: 50,
+				},
+			},
+			want: CachingConfig{
+				MaxCache: 50,
+			},
+		},
+		{
+			name: "empty caching config",
+			config: EncryptionConfig{
+				Caching: CachingConfig{},
+			},
+			want: CachingConfig{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.config.Caching.MaxCache != tt.want.MaxCache {
+				t.Errorf("Expected MaxCache to be %d, got %d", tt.want.MaxCache, tt.config.Caching.MaxCache)
+			}
+			if tt.config.Caching.MaxAge != tt.want.MaxAge {
+				t.Errorf("Expected MaxAge to be %s, got %s", tt.want.MaxAge, tt.config.Caching.MaxAge)
+			}
+			if tt.config.Caching.MaxUsage != tt.want.MaxUsage {
+				t.Errorf("Expected MaxUsage to be %d, got %d", tt.want.MaxUsage, tt.config.Caching.MaxUsage)
+			}
+		})
+	}
+}
+
+func TestTemporalAuthConfig_Structure(t *testing.T) {
+	tests := []struct {
+		name   string
+		config TemporalAuthConfig
+		desc   string
+	}{
+		{
+			name: "TLS authentication",
+			config: TemporalAuthConfig{
+				TLS: &TLSConfig{
+					CertFile: "/path/to/cert.crt",
+					KeyFile:  "/path/to/key.key",
+				},
+			},
+			desc: "should have TLS config and no API key",
+		},
+		{
+			name: "API key authentication with value",
+			config: TemporalAuthConfig{
+				ApiKey: &TemporalApiKeyConfig{
+					Value: "test-api-key",
+				},
+			},
+			desc: "should have API key and no TLS config",
+		},
+		{
+			name: "API key authentication with env var",
+			config: TemporalAuthConfig{
+				ApiKey: &TemporalApiKeyConfig{
+					EnvVar: "TEMPORAL_API_KEY",
+				},
+			},
+			desc: "should have API key env var and no TLS config",
+		},
+		{
+			name:   "empty authentication",
+			config: TemporalAuthConfig{},
+			desc:   "should have neither TLS nor API key",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			switch tt.name {
+			case "TLS authentication":
+				if tt.config.TLS == nil {
+					t.Error("Expected TLS to not be nil")
+				} else {
+					if tt.config.TLS.CertFile != "/path/to/cert.crt" {
+						t.Errorf("Expected CertFile to be '/path/to/cert.crt', got %s", tt.config.TLS.CertFile)
+					}
+					if tt.config.TLS.KeyFile != "/path/to/key.key" {
+						t.Errorf("Expected KeyFile to be '/path/to/key.key', got %s", tt.config.TLS.KeyFile)
+					}
+				}
+				if tt.config.ApiKey != nil {
+					t.Error("Expected ApiKey to be nil")
+				}
+			case "API key authentication with value":
+				if tt.config.ApiKey == nil {
+					t.Error("Expected ApiKey to not be nil")
+				} else {
+					if tt.config.ApiKey.Value != "test-api-key" {
+						t.Errorf("Expected ApiKey.Value to be 'test-api-key', got %s", tt.config.ApiKey.Value)
+					}
+					if tt.config.ApiKey.EnvVar != "" {
+						t.Errorf("Expected ApiKey.EnvVar to be empty, got %s", tt.config.ApiKey.EnvVar)
+					}
+				}
+				if tt.config.TLS != nil {
+					t.Error("Expected TLS to be nil")
+				}
+			case "API key authentication with env var":
+				if tt.config.ApiKey == nil {
+					t.Error("Expected ApiKey to not be nil")
+				} else {
+					if tt.config.ApiKey.EnvVar != "TEMPORAL_API_KEY" {
+						t.Errorf("Expected ApiKey.EnvVar to be 'TEMPORAL_API_KEY', got %s", tt.config.ApiKey.EnvVar)
+					}
+					if tt.config.ApiKey.Value != "" {
+						t.Errorf("Expected ApiKey.Value to be empty, got %s", tt.config.ApiKey.Value)
+					}
+				}
+				if tt.config.TLS != nil {
+					t.Error("Expected TLS to be nil")
+				}
+			case "empty authentication":
+				if tt.config.TLS != nil {
+					t.Error("Expected TLS to be nil")
+				}
+				if tt.config.ApiKey != nil {
+					t.Error("Expected ApiKey to be nil")
+				}
+			}
+		})
+	}
+}
+
 // Helper function to compare Config structs
 func configEqual(a, b Config) bool {
 	if a.Server.Port != b.Server.Port || a.Server.Host != b.Server.Host {
 		return false
 	}
 
-	if len(a.Targets) != len(b.Targets) {
+	if len(a.Workloads) != len(b.Workloads) {
 		return false
 	}
 
-	for i, targetA := range a.Targets {
-		targetB := b.Targets[i]
-		if !targetConfigEqual(targetA, targetB) {
+	for i, workloadA := range a.Workloads {
+		workloadB := b.Workloads[i]
+		if !workloadConfigEqual(workloadA, workloadB) {
 			return false
 		}
 	}
@@ -362,15 +653,41 @@ func configEqual(a, b Config) bool {
 	return true
 }
 
-func targetConfigEqual(a, b TargetConfig) bool {
-	if a.ProxyId != b.ProxyId || a.Target != b.Target || a.EncryptionKey != b.EncryptionKey || a.Namespace != b.Namespace {
+func workloadConfigEqual(a, b WorkloadConfig) bool {
+	if a.WorkloadId != b.WorkloadId || a.EncryptionKey != b.EncryptionKey {
 		return false
 	}
 
-	if a.TLS.CertFile != b.TLS.CertFile || a.TLS.KeyFile != b.TLS.KeyFile {
+	// Compare TemporalCloud configuration
+	if a.TemporalCloud.Namespace != b.TemporalCloud.Namespace || a.TemporalCloud.HostPort != b.TemporalCloud.HostPort {
 		return false
 	}
 
+	// Compare TemporalCloud Authentication - API Key
+	if (a.TemporalCloud.Authentication.ApiKey == nil) != (b.TemporalCloud.Authentication.ApiKey == nil) {
+		return false
+	}
+
+	if a.TemporalCloud.Authentication.ApiKey != nil && b.TemporalCloud.Authentication.ApiKey != nil {
+		if a.TemporalCloud.Authentication.ApiKey.Value != b.TemporalCloud.Authentication.ApiKey.Value ||
+			a.TemporalCloud.Authentication.ApiKey.EnvVar != b.TemporalCloud.Authentication.ApiKey.EnvVar {
+			return false
+		}
+	}
+
+	// Compare TLS configuration
+	if (a.TemporalCloud.Authentication.TLS == nil) != (b.TemporalCloud.Authentication.TLS == nil) {
+		return false
+	}
+
+	if a.TemporalCloud.Authentication.TLS != nil && b.TemporalCloud.Authentication.TLS != nil {
+		if a.TemporalCloud.Authentication.TLS.CertFile != b.TemporalCloud.Authentication.TLS.CertFile ||
+			a.TemporalCloud.Authentication.TLS.KeyFile != b.TemporalCloud.Authentication.TLS.KeyFile {
+			return false
+		}
+	}
+
+	// Compare proxy Authentication (spiffe, oauth, etc.)
 	if (a.Authentication == nil) != (b.Authentication == nil) {
 		return false
 	}
