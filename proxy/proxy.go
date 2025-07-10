@@ -69,7 +69,14 @@ func (mc *Conn) AddConn(input AddConnInput) error {
 	fmt.Printf("Adding connection id: %s namespace: %s hostport: %s\n",
 		input.Target.ProxyId, input.Target.TemporalCloud.Namespace, input.Target.TemporalCloud.HostPort)
 
-	if input.Target.TemporalCloud.Authentication.ApiKey != "" && input.Target.TemporalCloud.Authentication.TLS != nil {
+	mc.mu.RLock()
+	_, exists := mc.namespace[input.Target.ProxyId]
+	mc.mu.RUnlock()
+	if exists {
+		return fmt.Errorf("proxy-id %s already exists", input.Target.ProxyId)
+	}
+
+	if input.Target.TemporalCloud.Authentication.ApiKey != nil && input.Target.TemporalCloud.Authentication.TLS != nil {
 		return fmt.Errorf("%s: cannot have both api key and mtls authentication configured on a single target",
 			input.Target.ProxyId)
 	}
@@ -102,7 +109,23 @@ func (mc *Conn) AddConn(input AddConnInput) error {
 		clientInterceptor,
 	}
 
-	if input.Target.TemporalCloud.Authentication.ApiKey != "" {
+	if apiKeyConfig := input.Target.TemporalCloud.Authentication.ApiKey; apiKeyConfig != nil {
+		if apiKeyConfig.Value != "" && apiKeyConfig.EnvVar != "" {
+			// TODO proper logging
+			fmt.Printf("WARN - multiple values provided for api key, using value. proxy_id: %s\n", input.Target.ProxyId)
+		}
+
+		apiKey := ""
+		if apiKeyConfig.Value != "" {
+			apiKey = apiKeyConfig.Value
+		} else if apiKeyConfig.EnvVar != "" {
+			apiKey = os.Getenv(apiKeyConfig.EnvVar)
+		}
+
+		if apiKey == "" {
+			return fmt.Errorf("%s: no api key provided", input.Target.ProxyId)
+		}
+
 		grpcInterceptors = append(grpcInterceptors,
 			func(ctx context.Context, method string, req any, reply any, cc *grpc.ClientConn, invoker grpc.UnaryInvoker, opts ...grpc.CallOption) error {
 				md, ok := metadata.FromIncomingContext(ctx)
@@ -114,7 +137,7 @@ func (mc *Conn) AddConn(input AddConnInput) error {
 
 					ctx = metadata.NewOutgoingContext(ctx, md)
 					ctx = metadata.AppendToOutgoingContext(ctx, "temporal-namespace", input.Target.TemporalCloud.Namespace)
-					ctx = metadata.AppendToOutgoingContext(ctx, "authorization", "Bearer "+input.Target.TemporalCloud.Authentication.ApiKey)
+					ctx = metadata.AppendToOutgoingContext(ctx, "authorization", "Bearer "+apiKey)
 				}
 
 				return invoker(ctx, method, req, reply, cc, opts...)

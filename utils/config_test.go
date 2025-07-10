@@ -87,7 +87,7 @@ targets:
 			wantErr: false,
 		},
 		{
-			name: "valid config with API key authentication",
+			name: "valid config with API key authentication (value)",
 			yamlData: `
 server:
   port: 8080
@@ -100,7 +100,8 @@ targets:
       namespace: "simple"
       host_port: "simple.external:8080"
       authentication:
-        api_key: "your-api-key-here"
+        api_key:
+          value: "your-api-key-here"
     encryption_key: "simple-key"
 `,
 			want: Config{
@@ -121,7 +122,57 @@ targets:
 							Namespace: "simple",
 							HostPort:  "simple.external:8080",
 							Authentication: TemporalAuthConfig{
-								ApiKey: "your-api-key-here",
+								ApiKey: &TemporalApiKeyConfig{
+									Value: "your-api-key-here",
+								},
+							},
+						},
+						EncryptionKey:  "simple-key",
+						Authentication: nil,
+					},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "valid config with API key authentication (env var)",
+			yamlData: `
+server:
+  port: 8080
+  host: "localhost"
+metrics:
+  port: 9090
+targets:
+  - proxy_id: "simple.internal"
+    temporal_cloud:
+      namespace: "simple"
+      host_port: "simple.external:8080"
+      authentication:
+        api_key:
+          env: "TEMPORAL_API_KEY"
+    encryption_key: "simple-key"
+`,
+			want: Config{
+				Server: ServerConfig{
+					Port: 8080,
+					Host: "localhost",
+				},
+				Metrics: MetricsConfig{
+					Port: 9090,
+				},
+				Encryption: EncryptionConfig{
+					Caching: CachingConfig{},
+				},
+				Targets: []TargetConfig{
+					{
+						ProxyId: "simple.internal",
+						TemporalCloud: TemporalCloudConfig{
+							Namespace: "simple",
+							HostPort:  "simple.external:8080",
+							Authentication: TemporalAuthConfig{
+								ApiKey: &TemporalApiKeyConfig{
+									EnvVar: "TEMPORAL_API_KEY",
+								},
 							},
 						},
 						EncryptionKey:  "simple-key",
@@ -157,7 +208,8 @@ targets:
       namespace: "namespace2"
       host_port: "target2.external:9091"
       authentication:
-        api_key: "target2-api-key"
+        api_key:
+          value: "target2-api-key"
     encryption_key: "key2"
     authentication:
       type: "oauth"
@@ -200,7 +252,9 @@ targets:
 							Namespace: "namespace2",
 							HostPort:  "target2.external:9091",
 							Authentication: TemporalAuthConfig{
-								ApiKey: "target2-api-key",
+								ApiKey: &TemporalApiKeyConfig{
+									Value: "target2-api-key",
+								},
 							},
 						},
 						EncryptionKey: "key2",
@@ -498,11 +552,22 @@ func TestTemporalAuthConfig_Structure(t *testing.T) {
 			desc: "should have TLS config and no API key",
 		},
 		{
-			name: "API key authentication",
+			name: "API key authentication with value",
 			config: TemporalAuthConfig{
-				ApiKey: "test-api-key",
+				ApiKey: &TemporalApiKeyConfig{
+					Value: "test-api-key",
+				},
 			},
 			desc: "should have API key and no TLS config",
+		},
+		{
+			name: "API key authentication with env var",
+			config: TemporalAuthConfig{
+				ApiKey: &TemporalApiKeyConfig{
+					EnvVar: "TEMPORAL_API_KEY",
+				},
+			},
+			desc: "should have API key env var and no TLS config",
 		},
 		{
 			name:   "empty authentication",
@@ -525,12 +590,33 @@ func TestTemporalAuthConfig_Structure(t *testing.T) {
 						t.Errorf("Expected KeyFile to be '/path/to/key.key', got %s", tt.config.TLS.KeyFile)
 					}
 				}
-				if tt.config.ApiKey != "" {
-					t.Errorf("Expected ApiKey to be empty, got %s", tt.config.ApiKey)
+				if tt.config.ApiKey != nil {
+					t.Error("Expected ApiKey to be nil")
 				}
-			case "API key authentication":
-				if tt.config.ApiKey != "test-api-key" {
-					t.Errorf("Expected ApiKey to be 'test-api-key', got %s", tt.config.ApiKey)
+			case "API key authentication with value":
+				if tt.config.ApiKey == nil {
+					t.Error("Expected ApiKey to not be nil")
+				} else {
+					if tt.config.ApiKey.Value != "test-api-key" {
+						t.Errorf("Expected ApiKey.Value to be 'test-api-key', got %s", tt.config.ApiKey.Value)
+					}
+					if tt.config.ApiKey.EnvVar != "" {
+						t.Errorf("Expected ApiKey.EnvVar to be empty, got %s", tt.config.ApiKey.EnvVar)
+					}
+				}
+				if tt.config.TLS != nil {
+					t.Error("Expected TLS to be nil")
+				}
+			case "API key authentication with env var":
+				if tt.config.ApiKey == nil {
+					t.Error("Expected ApiKey to not be nil")
+				} else {
+					if tt.config.ApiKey.EnvVar != "TEMPORAL_API_KEY" {
+						t.Errorf("Expected ApiKey.EnvVar to be 'TEMPORAL_API_KEY', got %s", tt.config.ApiKey.EnvVar)
+					}
+					if tt.config.ApiKey.Value != "" {
+						t.Errorf("Expected ApiKey.Value to be empty, got %s", tt.config.ApiKey.Value)
+					}
 				}
 				if tt.config.TLS != nil {
 					t.Error("Expected TLS to be nil")
@@ -539,8 +625,8 @@ func TestTemporalAuthConfig_Structure(t *testing.T) {
 				if tt.config.TLS != nil {
 					t.Error("Expected TLS to be nil")
 				}
-				if tt.config.ApiKey != "" {
-					t.Errorf("Expected ApiKey to be empty, got %s", tt.config.ApiKey)
+				if tt.config.ApiKey != nil {
+					t.Error("Expected ApiKey to be nil")
 				}
 			}
 		})
@@ -577,9 +663,16 @@ func targetConfigEqual(a, b TargetConfig) bool {
 		return false
 	}
 
-	// Compare TemporalCloud Authentication
-	if a.TemporalCloud.Authentication.ApiKey != b.TemporalCloud.Authentication.ApiKey {
+	// Compare TemporalCloud Authentication - API Key
+	if (a.TemporalCloud.Authentication.ApiKey == nil) != (b.TemporalCloud.Authentication.ApiKey == nil) {
 		return false
+	}
+
+	if a.TemporalCloud.Authentication.ApiKey != nil && b.TemporalCloud.Authentication.ApiKey != nil {
+		if a.TemporalCloud.Authentication.ApiKey.Value != b.TemporalCloud.Authentication.ApiKey.Value ||
+			a.TemporalCloud.Authentication.ApiKey.EnvVar != b.TemporalCloud.Authentication.ApiKey.EnvVar {
+			return false
+		}
 	}
 
 	// Compare TLS configuration

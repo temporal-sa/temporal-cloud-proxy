@@ -40,8 +40,13 @@ type TemporalCloudConfig struct {
 }
 
 type TemporalAuthConfig struct {
-	TLS    *TLSConfig `yaml:"tls,omitempty"`
-	ApiKey string     `yaml:"api_key,omitempty"`
+	TLS    *TLSConfig            `yaml:"tls,omitempty"`
+	ApiKey *TemporalApiKeyConfig `yaml:"api_key,omitempty"`
+}
+
+type TemporalApiKeyConfig struct {
+	Value  string `yaml:"value,omitempty"`
+	EnvVar string `yaml:"env,omitempty"`
 }
 
 type TLSConfig struct {

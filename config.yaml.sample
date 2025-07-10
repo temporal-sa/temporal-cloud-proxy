@@ -12,17 +12,18 @@ encryption:
     max_usage: 100
 
 targets:
-  - proxy_id: "<namespace>.<account>.internal"
+  - proxy_id: "<id>"
     temporal_cloud:
       namespace: "<namespace>.<account>"
       host_port: "<namespace>.<account>.tmprl.cloud:7233" # endpoint when using mTLS
       # host_port: "<region>.<cloud>.api.temporal.io:7233" # endpoint when using API keys
-      authentication:
-        # only set either tls or api_key
+      authentication: # only set either tls or api_key, not both
         tls:
           cert_file: "/path/to/<namespace>.<account>/tls.crt"
           key_file: "/path/to/<namespace>.<account>/tls.key"
-        api_key: "<api key>"
+        api_key: # only set either value or env, not both
+            value: "<api key>"
+            env: <env_var>
     encryption_key: "<key>"
     authentication:
       type: "spiffe"
@@ -32,17 +33,18 @@ targets:
         audiences:
           - "temporal_cloud_proxy"
 
-  - proxy_id: "<namespace>.<account>.internal"
+  - proxy_id: "<id>"
     temporal_cloud:
       namespace: "<namespace>.<account>"
       host_port: "<namespace>.<account>.tmprl.cloud:7233" # endpoint when using mTLS
       # host_port: "<region>.<cloud>.api.temporal.io:7233" # endpoint when using API keys
-      authentication:
-        # only set either tls or api_key
+      authentication: # only set either tls or api_key, not both
         tls:
           cert_file: "/path/to/<namespace>.<account>/tls.crt"
           key_file: "/path/to/<namespace>.<account>/tls.key"
-        api_key: "ey..."
+        api_key: # only set either value or env, not both
+            value: "<api key>"
+            env: <env_var>
     encryption_key: "<key>"
     authentication:
       type: "spiffe"

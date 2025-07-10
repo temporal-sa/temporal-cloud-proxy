@@ -142,7 +142,7 @@ func TestConn_AddConn(t *testing.T) {
 			expectError: false,
 		},
 		{
-			name: "successful connection addition with API key",
+			name: "successful connection addition with API key (value)",
 			input: AddConnInput{
 				Target: &utils.TargetConfig{
 					ProxyId: "test-proxy-id-api",
@@ -150,7 +150,9 @@ func TestConn_AddConn(t *testing.T) {
 						Namespace: "test-namespace",
 						HostPort:  "localhost:7233",
 						Authentication: utils.TemporalAuthConfig{
-							ApiKey: "test-api-key",
+							ApiKey: &utils.TemporalApiKeyConfig{
+								Value: "test-api-key",
+							},
 						},
 					},
 					EncryptionKey: "test-key-id",
@@ -161,6 +163,29 @@ func TestConn_AddConn(t *testing.T) {
 				CryptoCachingConfig: nil,
 			},
 			expectError: false,
+		},
+		{
+			name: "successful connection addition with API key (env var)",
+			input: AddConnInput{
+				Target: &utils.TargetConfig{
+					ProxyId: "test-proxy-id-api-env",
+					TemporalCloud: utils.TemporalCloudConfig{
+						Namespace: "test-namespace",
+						HostPort:  "localhost:7233",
+						Authentication: utils.TemporalAuthConfig{
+							ApiKey: &utils.TemporalApiKeyConfig{
+								EnvVar: "TEST_TEMPORAL_API_KEY",
+							},
+						},
+					},
+					EncryptionKey: "test-key-id",
+				},
+				AuthManager:         nil,
+				AuthType:            "jwt",
+				MetricsHandler:      metrics.NewMetricsHandler(metrics.MetricsHandlerOptions{}),
+				CryptoCachingConfig: nil,
+			},
+			expectError: true, // Will fail because env var is not set
 		},
 		{
 			name: "invalid certificate path",
@@ -219,7 +244,9 @@ func TestConn_AddConn(t *testing.T) {
 						Namespace: "test-namespace",
 						HostPort:  "localhost:7233",
 						Authentication: utils.TemporalAuthConfig{
-							ApiKey: "test-api-key",
+							ApiKey: &utils.TemporalApiKeyConfig{
+								Value: "test-api-key",
+							},
 							TLS: &utils.TLSConfig{
 								CertFile: certPath,
 								KeyFile:  keyPath,
