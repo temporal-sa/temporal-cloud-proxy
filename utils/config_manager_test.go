@@ -23,14 +23,16 @@ func TestNewConfigManager(t *testing.T) {
 server:
   port: 7233
   host: "0.0.0.0"
-targets:
-  - proxy_id: "test.internal"
-    target: "test.external:7233"
-    tls:
-      cert_file: "/path/to/cert.crt"
-      key_file: "/path/to/key.key"
+workloads:
+  - workload_id: "test.internal"
+    temporal_cloud:
+      namespace: "test-namespace"
+      host_port: "test.external:7233"
+      authentication:
+        tls:
+          cert_file: "/path/to/cert.crt"
+          key_file: "/path/to/key.key"
     encryption_key: "test-key"
-    namespace: "test-namespace"
 `,
 			wantErr:     false,
 			expectNil:   false,
@@ -42,11 +44,11 @@ targets:
 server:
   port: 8080
   host: "localhost"
-targets: []
+workloads: []
 `,
 			wantErr:     false,
 			expectNil:   false,
-			description: "should handle minimal config with empty targets",
+			description: "should handle minimal config with empty workloads",
 		},
 		{
 			name: "invalid yaml",
@@ -134,21 +136,25 @@ func TestConfigManager_GetConfig(t *testing.T) {
 server:
   port: 9090
   host: "127.0.0.1"
-targets:
-  - proxy_id: "test1.internal"
-    target: "test1.external:9090"
-    tls:
-      cert_file: "/test1.crt"
-      key_file: "/test1.key"
+workloads:
+  - workload_id: "test1.internal"
+    temporal_cloud:
+      namespace: "namespace1"
+      host_port: "test1.external:9090"
+      authentication:
+        tls:
+          cert_file: "/test1.crt"
+          key_file: "/test1.key"
     encryption_key: "key1"
-    namespace: "namespace1"
-  - proxy_id: "test2.internal"
-    target: "test2.external:9091"
-    tls:
-      cert_file: "/test2.crt"
-      key_file: "/test2.key"
+  - workload_id: "test2.internal"
+    temporal_cloud:
+      namespace: "namespace2"
+      host_port: "test2.external:9091"
+      authentication:
+        tls:
+          cert_file: "/test2.crt"
+          key_file: "/test2.key"
     encryption_key: "key2"
-    namespace: "namespace2"
     authentication:
       type: "spiffe"
       config:
@@ -182,30 +188,30 @@ targets:
 		t.Errorf("Expected server host to be '127.0.0.1', got %s", config.Server.Host)
 	}
 
-	// Verify targets
-	if len(config.Targets) != 2 {
-		t.Errorf("Expected 2 targets, got %d", len(config.Targets))
+	// Verify workloads
+	if len(config.Workloads) != 2 {
+		t.Errorf("Expected 2 workloads, got %d", len(config.Workloads))
 	}
 
-	if len(config.Targets) >= 1 {
-		target1 := config.Targets[0]
-		if target1.ProxyId != "test1.internal" {
-			t.Errorf("Expected first target proxy_id to be 'test1.internal', got %s", target1.ProxyId)
+	if len(config.Workloads) >= 1 {
+		workload1 := config.Workloads[0]
+		if workload1.WorkloadId != "test1.internal" {
+			t.Errorf("Expected first workload workload_id to be 'test1.internal', got %s", workload1.WorkloadId)
 		}
-		if target1.Authentication != nil {
-			t.Error("Expected first target to have no authentication")
+		if workload1.Authentication != nil {
+			t.Error("Expected first workload to have no authentication")
 		}
 	}
 
-	if len(config.Targets) >= 2 {
-		target2 := config.Targets[1]
-		if target2.ProxyId != "test2.internal" {
-			t.Errorf("Expected second target proxy_id to be 'test2.internal', got %s", target2.ProxyId)
+	if len(config.Workloads) >= 2 {
+		workload2 := config.Workloads[1]
+		if workload2.WorkloadId != "test2.internal" {
+			t.Errorf("Expected second workload workload_id to be 'test2.internal', got %s", workload2.WorkloadId)
 		}
-		if target2.Authentication == nil {
-			t.Error("Expected second target to have authentication")
-		} else if target2.Authentication.Type != "spiffe" {
-			t.Errorf("Expected second target auth type to be 'spiffe', got %s", target2.Authentication.Type)
+		if workload2.Authentication == nil {
+			t.Error("Expected second workload to have authentication")
+		} else if workload2.Authentication.Type != "spiffe" {
+			t.Errorf("Expected second workload auth type to be 'spiffe', got %s", workload2.Authentication.Type)
 		}
 	}
 }
@@ -215,14 +221,16 @@ func TestConfigManager_GetConfig_ThreadSafety(t *testing.T) {
 server:
   port: 8080
   host: "localhost"
-targets:
-  - proxy_id: "concurrent.internal"
-    target: "concurrent.external:8080"
-    tls:
-      cert_file: "/concurrent.crt"
-      key_file: "/concurrent.key"
+workloads:
+  - workload_id: "concurrent.internal"
+    temporal_cloud:
+      namespace: "concurrent-namespace"
+      host_port: "concurrent.external:8080"
+      authentication:
+        tls:
+          cert_file: "/concurrent.crt"
+          key_file: "/concurrent.key"
     encryption_key: "concurrent-key"
-    namespace: "concurrent-namespace"
 `
 
 	tmpDir := t.TempDir()
@@ -259,11 +267,11 @@ targets:
 					errors <- err
 					return
 				}
-				if len(config.Targets) != 1 {
+				if len(config.Workloads) != 1 {
 					errors <- err
 					return
 				}
-				if config.Targets[0].ProxyId != "concurrent.internal" {
+				if config.Workloads[0].WorkloadId != "concurrent.internal" {
 					errors <- err
 					return
 				}

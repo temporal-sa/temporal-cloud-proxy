@@ -26,8 +26,8 @@ encryption:
     max_cache: 100
     max_age: "1h"
     max_usage: 1000
-targets:
-  - proxy_id: "test.namespace.internal"
+workloads:
+  - workload_id: "test.namespace.internal"
     temporal_cloud:
       namespace: "test.namespace"
       host_port: "test.namespace.tmprl.cloud:7233"
@@ -59,9 +59,9 @@ targets:
 						MaxUsage: 1000,
 					},
 				},
-				Targets: []TargetConfig{
+				Workloads: []WorkloadConfig{
 					{
-						ProxyId: "test.namespace.internal",
+						WorkloadId: "test.namespace.internal",
 						TemporalCloud: TemporalCloudConfig{
 							Namespace: "test.namespace",
 							HostPort:  "test.namespace.tmprl.cloud:7233",
@@ -94,8 +94,8 @@ server:
   host: "localhost"
 metrics:
   port: 9090
-targets:
-  - proxy_id: "simple.internal"
+workloads:
+  - workload_id: "simple.internal"
     temporal_cloud:
       namespace: "simple"
       host_port: "simple.external:8080"
@@ -115,9 +115,9 @@ targets:
 				Encryption: EncryptionConfig{
 					Caching: CachingConfig{},
 				},
-				Targets: []TargetConfig{
+				Workloads: []WorkloadConfig{
 					{
-						ProxyId: "simple.internal",
+						WorkloadId: "simple.internal",
 						TemporalCloud: TemporalCloudConfig{
 							Namespace: "simple",
 							HostPort:  "simple.external:8080",
@@ -142,8 +142,8 @@ server:
   host: "localhost"
 metrics:
   port: 9090
-targets:
-  - proxy_id: "simple.internal"
+workloads:
+  - workload_id: "simple.internal"
     temporal_cloud:
       namespace: "simple"
       host_port: "simple.external:8080"
@@ -163,9 +163,9 @@ targets:
 				Encryption: EncryptionConfig{
 					Caching: CachingConfig{},
 				},
-				Targets: []TargetConfig{
+				Workloads: []WorkloadConfig{
 					{
-						ProxyId: "simple.internal",
+						WorkloadId: "simple.internal",
 						TemporalCloud: TemporalCloudConfig{
 							Namespace: "simple",
 							HostPort:  "simple.external:8080",
@@ -183,7 +183,7 @@ targets:
 			wantErr: false,
 		},
 		{
-			name: "multiple targets with mixed authentication",
+			name: "multiple workloads with mixed authentication",
 			yamlData: `
 server:
   port: 9090
@@ -193,23 +193,23 @@ metrics:
 encryption:
   caching:
     max_cache: 50
-targets:
-  - proxy_id: "target1.internal"
+workloads:
+  - workload_id: "workload1.internal"
     temporal_cloud:
       namespace: "namespace1"
-      host_port: "target1.external:9090"
+      host_port: "workload1.external:9090"
       authentication:
         tls:
-          cert_file: "/target1.crt"
-          key_file: "/target1.key"
+          cert_file: "/workload1.crt"
+          key_file: "/workload1.key"
     encryption_key: "key1"
-  - proxy_id: "target2.internal"
+  - workload_id: "workload2.internal"
     temporal_cloud:
       namespace: "namespace2"
-      host_port: "target2.external:9091"
+      host_port: "workload2.external:9091"
       authentication:
         api_key:
-          value: "target2-api-key"
+          value: "workload2-api-key"
     encryption_key: "key2"
     authentication:
       type: "oauth"
@@ -230,16 +230,16 @@ targets:
 						MaxCache: 50,
 					},
 				},
-				Targets: []TargetConfig{
+				Workloads: []WorkloadConfig{
 					{
-						ProxyId: "target1.internal",
+						WorkloadId: "workload1.internal",
 						TemporalCloud: TemporalCloudConfig{
 							Namespace: "namespace1",
-							HostPort:  "target1.external:9090",
+							HostPort:  "workload1.external:9090",
 							Authentication: TemporalAuthConfig{
 								TLS: &TLSConfig{
-									CertFile: "/target1.crt",
-									KeyFile:  "/target1.key",
+									CertFile: "/workload1.crt",
+									KeyFile:  "/workload1.key",
 								},
 							},
 						},
@@ -247,13 +247,13 @@ targets:
 						Authentication: nil,
 					},
 					{
-						ProxyId: "target2.internal",
+						WorkloadId: "workload2.internal",
 						TemporalCloud: TemporalCloudConfig{
 							Namespace: "namespace2",
-							HostPort:  "target2.external:9091",
+							HostPort:  "workload2.external:9091",
 							Authentication: TemporalAuthConfig{
 								ApiKey: &TemporalApiKeyConfig{
-									Value: "target2-api-key",
+									Value: "workload2-api-key",
 								},
 							},
 						},
@@ -348,9 +348,9 @@ func TestServerConfig_Validation(t *testing.T) {
 	}
 }
 
-func TestTargetConfig_Structure(t *testing.T) {
-	target := TargetConfig{
-		ProxyId: "test.internal",
+func TestWorkloadConfig_Structure(t *testing.T) {
+	workload := WorkloadConfig{
+		WorkloadId: "test.internal",
 		TemporalCloud: TemporalCloudConfig{
 			Namespace: "test-namespace",
 			HostPort:  "test.external:7233",
@@ -370,31 +370,31 @@ func TestTargetConfig_Structure(t *testing.T) {
 		},
 	}
 
-	if target.ProxyId != "test.internal" {
-		t.Errorf("Expected ProxyId to be 'test.internal', got %s", target.ProxyId)
+	if workload.WorkloadId != "test.internal" {
+		t.Errorf("Expected WorkloadId to be 'test.internal', got %s", workload.WorkloadId)
 	}
-	if target.TemporalCloud.HostPort != "test.external:7233" {
-		t.Errorf("Expected TemporalCloud.HostPort to be 'test.external:7233', got %s", target.TemporalCloud.HostPort)
+	if workload.TemporalCloud.HostPort != "test.external:7233" {
+		t.Errorf("Expected TemporalCloud.HostPort to be 'test.external:7233', got %s", workload.TemporalCloud.HostPort)
 	}
-	if target.EncryptionKey != "test-key" {
-		t.Errorf("Expected EncryptionKey to be 'test-key', got %s", target.EncryptionKey)
+	if workload.EncryptionKey != "test-key" {
+		t.Errorf("Expected EncryptionKey to be 'test-key', got %s", workload.EncryptionKey)
 	}
-	if target.TemporalCloud.Namespace != "test-namespace" {
-		t.Errorf("Expected TemporalCloud.Namespace to be 'test-namespace', got %s", target.TemporalCloud.Namespace)
+	if workload.TemporalCloud.Namespace != "test-namespace" {
+		t.Errorf("Expected TemporalCloud.Namespace to be 'test-namespace', got %s", workload.TemporalCloud.Namespace)
 	}
-	if target.TemporalCloud.Authentication.TLS.CertFile != "/path/to/cert.crt" {
-		t.Errorf("Expected TemporalCloud.Authentication.TLS.CertFile to be '/path/to/cert.crt', got %s", target.TemporalCloud.Authentication.TLS.CertFile)
+	if workload.TemporalCloud.Authentication.TLS.CertFile != "/path/to/cert.crt" {
+		t.Errorf("Expected TemporalCloud.Authentication.TLS.CertFile to be '/path/to/cert.crt', got %s", workload.TemporalCloud.Authentication.TLS.CertFile)
 	}
-	if target.TemporalCloud.Authentication.TLS.KeyFile != "/path/to/key.key" {
-		t.Errorf("Expected TemporalCloud.Authentication.TLS.KeyFile to be '/path/to/key.key', got %s", target.TemporalCloud.Authentication.TLS.KeyFile)
+	if workload.TemporalCloud.Authentication.TLS.KeyFile != "/path/to/key.key" {
+		t.Errorf("Expected TemporalCloud.Authentication.TLS.KeyFile to be '/path/to/key.key', got %s", workload.TemporalCloud.Authentication.TLS.KeyFile)
 	}
-	if target.Authentication == nil {
+	if workload.Authentication == nil {
 		t.Error("Expected Authentication to not be nil")
 	} else {
-		if target.Authentication.Type != "spiffe" {
-			t.Errorf("Expected Authentication.Type to be 'spiffe', got %s", target.Authentication.Type)
+		if workload.Authentication.Type != "spiffe" {
+			t.Errorf("Expected Authentication.Type to be 'spiffe', got %s", workload.Authentication.Type)
 		}
-		if trustDomain, ok := target.Authentication.Config["trust_domain"]; !ok || trustDomain != "spiffe://example.org/" {
+		if trustDomain, ok := workload.Authentication.Config["trust_domain"]; !ok || trustDomain != "spiffe://example.org/" {
 			t.Errorf("Expected trust_domain to be 'spiffe://example.org/', got %v", trustDomain)
 		}
 	}
@@ -639,13 +639,13 @@ func configEqual(a, b Config) bool {
 		return false
 	}
 
-	if len(a.Targets) != len(b.Targets) {
+	if len(a.Workloads) != len(b.Workloads) {
 		return false
 	}
 
-	for i, targetA := range a.Targets {
-		targetB := b.Targets[i]
-		if !targetConfigEqual(targetA, targetB) {
+	for i, workloadA := range a.Workloads {
+		workloadB := b.Workloads[i]
+		if !workloadConfigEqual(workloadA, workloadB) {
 			return false
 		}
 	}
@@ -653,8 +653,8 @@ func configEqual(a, b Config) bool {
 	return true
 }
 
-func targetConfigEqual(a, b TargetConfig) bool {
-	if a.ProxyId != b.ProxyId || a.EncryptionKey != b.EncryptionKey {
+func workloadConfigEqual(a, b WorkloadConfig) bool {
+	if a.WorkloadId != b.WorkloadId || a.EncryptionKey != b.EncryptionKey {
 		return false
 	}
 

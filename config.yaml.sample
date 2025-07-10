@@ -11,8 +11,8 @@ encryption:
     max_age: "10m"
     max_usage: 100
 
-targets:
-  - proxy_id: "<id>"
+workloads:
+  - workload_id: "<id>"
     temporal_cloud:
       namespace: "<namespace>.<account>"
       host_port: "<namespace>.<account>.tmprl.cloud:7233" # endpoint when using mTLS
@@ -33,7 +33,7 @@ targets:
         audiences:
           - "temporal_cloud_proxy"
 
-  - proxy_id: "<id>"
+  - workload_id: "<id>"
     temporal_cloud:
       namespace: "<namespace>.<account>"
       host_port: "<namespace>.<account>.tmprl.cloud:7233" # endpoint when using mTLS

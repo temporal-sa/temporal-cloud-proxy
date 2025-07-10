@@ -4,7 +4,7 @@ type Config struct {
 	Server     ServerConfig     `yaml:"server"`
 	Metrics    MetricsConfig    `yaml:"metrics"`
 	Encryption EncryptionConfig `yaml:"encryption"`
-	Targets    []TargetConfig   `yaml:"targets"`
+	Workloads  []WorkloadConfig `yaml:"workloads"`
 }
 
 type ServerConfig struct {
@@ -26,8 +26,8 @@ type CachingConfig struct {
 	MaxUsage int    `yaml:"max_usage,omitempty"`
 }
 
-type TargetConfig struct {
-	ProxyId        string              `yaml:"proxy_id"`
+type WorkloadConfig struct {
+	WorkloadId     string              `yaml:"workload_id"`
 	TemporalCloud  TemporalCloudConfig `yaml:"temporal_cloud"`
 	EncryptionKey  string              `yaml:"encryption_key"`
 	Authentication *AuthConfig         `yaml:"authentication,omitempty"`

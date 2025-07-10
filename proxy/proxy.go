@@ -57,7 +57,7 @@ func createKMSClient() *kms.KMS {
 
 // AddConnInput contains parameters for adding a new connection
 type AddConnInput struct {
-	Target              *utils.TargetConfig
+	Workload            *utils.WorkloadConfig
 	AuthManager         *auth.AuthManager
 	AuthType            string
 	MetricsHandler      metrics.MetricsHandler
@@ -67,25 +67,25 @@ type AddConnInput struct {
 // AddConn adds a new connection to the proxy
 func (mc *Conn) AddConn(input AddConnInput) error {
 	fmt.Printf("Adding connection id: %s namespace: %s hostport: %s\n",
-		input.Target.ProxyId, input.Target.TemporalCloud.Namespace, input.Target.TemporalCloud.HostPort)
+		input.Workload.WorkloadId, input.Workload.TemporalCloud.Namespace, input.Workload.TemporalCloud.HostPort)
 
 	mc.mu.RLock()
-	_, exists := mc.namespace[input.Target.ProxyId]
+	_, exists := mc.namespace[input.Workload.WorkloadId]
 	mc.mu.RUnlock()
 	if exists {
-		return fmt.Errorf("proxy-id %s already exists", input.Target.ProxyId)
+		return fmt.Errorf("workload-id %s already exists", input.Workload.WorkloadId)
 	}
 
-	if input.Target.TemporalCloud.Authentication.ApiKey != nil && input.Target.TemporalCloud.Authentication.TLS != nil {
-		return fmt.Errorf("%s: cannot have both api key and mtls authentication configured on a single target",
-			input.Target.ProxyId)
+	if input.Workload.TemporalCloud.Authentication.ApiKey != nil && input.Workload.TemporalCloud.Authentication.TLS != nil {
+		return fmt.Errorf("%s: cannot have both api key and mtls authentication configured on a single workload",
+			input.Workload.WorkloadId)
 	}
 
 	//Initialize AWS KMS client
 	kmsClient := createKMSClient()
 
 	codecContext := map[string]string{
-		"namespace": input.Target.TemporalCloud.Namespace,
+		"namespace": input.Workload.TemporalCloud.Namespace,
 	}
 
 	clientInterceptor, err := converter.NewPayloadCodecGRPCClientInterceptor(
@@ -93,7 +93,7 @@ func (mc *Conn) AddConn(input AddConnInput) error {
 			Codecs: []converter.PayloadCodec{codec.NewEncryptionCodecWithCaching(
 				kmsClient,
 				codecContext,
-				input.Target.EncryptionKey,
+				input.Workload.EncryptionKey,
 				input.MetricsHandler,
 				input.CryptoCachingConfig,
 			)},
@@ -109,10 +109,10 @@ func (mc *Conn) AddConn(input AddConnInput) error {
 		clientInterceptor,
 	}
 
-	if apiKeyConfig := input.Target.TemporalCloud.Authentication.ApiKey; apiKeyConfig != nil {
+	if apiKeyConfig := input.Workload.TemporalCloud.Authentication.ApiKey; apiKeyConfig != nil {
 		if apiKeyConfig.Value != "" && apiKeyConfig.EnvVar != "" {
 			// TODO proper logging
-			fmt.Printf("WARN - multiple values provided for api key, using value. proxy_id: %s\n", input.Target.ProxyId)
+			fmt.Printf("WARN - multiple values provided for api key, using value. workload-id: %s\n", input.Workload.WorkloadId)
 		}
 
 		apiKey := ""
@@ -123,7 +123,7 @@ func (mc *Conn) AddConn(input AddConnInput) error {
 		}
 
 		if apiKey == "" {
-			return fmt.Errorf("%s: no api key provided", input.Target.ProxyId)
+			return fmt.Errorf("%s: no api key provided", input.Workload.WorkloadId)
 		}
 
 		grpcInterceptors = append(grpcInterceptors,
@@ -136,15 +136,15 @@ func (mc *Conn) AddConn(input AddConnInput) error {
 					md.Delete("temporal-namespace")
 
 					ctx = metadata.NewOutgoingContext(ctx, md)
-					ctx = metadata.AppendToOutgoingContext(ctx, "temporal-namespace", input.Target.TemporalCloud.Namespace)
+					ctx = metadata.AppendToOutgoingContext(ctx, "temporal-namespace", input.Workload.TemporalCloud.Namespace)
 					ctx = metadata.AppendToOutgoingContext(ctx, "authorization", "Bearer "+apiKey)
 				}
 
 				return invoker(ctx, method, req, reply, cc, opts...)
 			})
 	} else {
-		cert, err := tls.LoadX509KeyPair(input.Target.TemporalCloud.Authentication.TLS.CertFile,
-			input.Target.TemporalCloud.Authentication.TLS.KeyFile)
+		cert, err := tls.LoadX509KeyPair(input.Workload.TemporalCloud.Authentication.TLS.CertFile,
+			input.Workload.TemporalCloud.Authentication.TLS.KeyFile)
 		if err != nil {
 			return err
 		}
@@ -153,7 +153,7 @@ func (mc *Conn) AddConn(input AddConnInput) error {
 	}
 
 	conn, err := grpc.NewClient(
-		input.Target.TemporalCloud.HostPort,
+		input.Workload.TemporalCloud.HostPort,
 		grpc.WithTransportCredentials(credentials.NewTLS(
 			&tlsConfig,
 		)),
@@ -164,7 +164,7 @@ func (mc *Conn) AddConn(input AddConnInput) error {
 	}
 
 	mc.mu.Lock()
-	mc.namespace[input.Target.ProxyId] = NamespaceConn{
+	mc.namespace[input.Workload.WorkloadId] = NamespaceConn{
 		conn:        conn,
 		authManager: input.AuthManager,
 		authType:    input.AuthType,
@@ -202,21 +202,21 @@ func (mc *Conn) Invoke(ctx context.Context, method string, args interface{}, rep
 		return status.Errorf(codes.InvalidArgument, "unable to read metadata")
 	}
 
-	proxyId := md.Get("proxy-id")
+	workloadId := md.Get("workload-id")
 
-	if len(proxyId) <= 0 {
-		return status.Error(codes.InvalidArgument, "metadata missing proxy-id")
+	if len(workloadId) <= 0 {
+		return status.Error(codes.InvalidArgument, "metadata missing workload-id")
 	}
-	if len(proxyId) != 1 {
-		return status.Error(codes.InvalidArgument, "metadata contains multiple proxy-id entries")
+	if len(workloadId) != 1 {
+		return status.Error(codes.InvalidArgument, "metadata contains multiple workload-id entries")
 	}
 
 	mc.mu.RLock()
-	namespace, exists := mc.namespace[proxyId[0]]
+	namespace, exists := mc.namespace[workloadId[0]]
 	mc.mu.RUnlock()
 
 	if !exists {
-		return status.Errorf(codes.InvalidArgument, "invalid proxy-id: %s", proxyId[0])
+		return status.Errorf(codes.InvalidArgument, "invalid workload-id: %s", workloadId[0])
 	}
 
 	if namespace.authManager != nil {
