@@ -116,48 +116,23 @@ func configureProxy(proxyConns *proxy.Conn, cfg *utils.Config) error {
 		if w.Authentication != nil {
 			authManager = auth.NewAuthManager()
 			authType = w.Authentication.Type
+			var authProvider auth.Authenticator
 
 			switch authType {
 			case "spiffe":
-				spiffeAuth := &auth.SpiffeAuthenticator{}
-
-				if audiences, ok := w.Authentication.Config["audiences"].([]interface{}); ok {
-					for _, a := range audiences {
-						if audience, ok := a.(string); ok {
-							spiffeAuth.Audiences = append(spiffeAuth.Audiences, audience)
-						}
-					}
-				}
-
-				if err := spiffeAuth.Init(ctx, w.Authentication.Config); err != nil {
-					return fmt.Errorf("failed to initialize spiffe authenticator: %w", err)
-				}
-
-				if err := authManager.RegisterAuthenticator(spiffeAuth); err != nil {
-					return err
-				}
-
+				authProvider = &auth.SpiffeAuthenticator{}
 			case "jwt":
-				jwtAuth := &auth.JwtAuthenticator{}
-
-				if audiences, ok := w.Authentication.Config["audiences"].([]interface{}); ok {
-					for _, a := range audiences {
-						if audience, ok := a.(string); ok {
-							jwtAuth.Audiences = append(jwtAuth.Audiences, audience)
-						}
-					}
-				}
-
-				if err := jwtAuth.Init(ctx, w.Authentication.Config); err != nil {
-					return fmt.Errorf("failed to initialize jwt authenticator: %w", err)
-				}
-
-				if err := authManager.RegisterAuthenticator(jwtAuth); err != nil {
-					return err
-				}
-
+				authProvider = &auth.JwtAuthenticator{}
 			default:
 				return fmt.Errorf("unsupported authentication type: %s", authType)
+			}
+
+			if err := authProvider.Init(ctx, w.Authentication.Config); err != nil {
+				return fmt.Errorf("failed to initialize %s authenticator: %w", authType, err)
+			}
+
+			if err := authManager.RegisterAuthenticator(authProvider); err != nil {
+				return err
 			}
 		}
 

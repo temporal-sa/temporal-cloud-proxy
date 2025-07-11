@@ -38,6 +38,14 @@ func (j *JwtAuthenticator) Init(ctx context.Context, config map[string]interface
 
 	j.jwks = jwks
 
+	if audiences, ok := config["audiences"].([]interface{}); ok {
+		for _, a := range audiences {
+			if audience, ok := a.(string); ok {
+				j.Audiences = append(j.Audiences, audience)
+			}
+		}
+	}
+
 	return nil
 }
 
