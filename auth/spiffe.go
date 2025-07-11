@@ -87,10 +87,6 @@ func (s *SpiffeAuthenticator) Authenticate(ctx context.Context, credentials inte
 	}, nil
 }
 
-func (s *SpiffeAuthenticator) Refresh(ctx context.Context, result *AuthenticationResult) (*AuthenticationResult, error) {
-	return result, fmt.Errorf("refresh not applicable for SPIFFE JWT-SWIDs")
-}
-
 func (s *SpiffeAuthenticator) Close() error {
 	if s.jwtSource != nil {
 		return s.jwtSource.Close()

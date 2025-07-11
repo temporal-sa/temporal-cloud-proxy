@@ -25,13 +25,19 @@ workloads:
             value: "<api key>"
             env: <env_var>
     encryption_key: "<key>"
-    authentication:
-      type: "spiffe"
-      config:
-        trust_domain: "spiffe://example.org/"
-        endpoint: "unix:///tmp/spire-agent/public/api.sock"
-        audiences:
-          - "temporal_cloud_proxy"
+#    authentication: # spiffe authentication example
+#      type: "spiffe"
+#      config:
+#        trust_domain: "spiffe://example.org/"
+#        endpoint: "unix:///tmp/spire-agent/public/api.sock"
+#        audiences:
+#          - "temporal_cloud_proxy"
+#    authentication: # jwt authentication example
+#      type: "jwt"
+#      config:
+#        jwks-url: "http://localhost:8200/v1/identity/oidc/.well-known/keys"
+#        audiences:
+#        - "temporal_cloud_proxy"
 
   - workload_id: "<id>"
     temporal_cloud:
@@ -46,10 +52,16 @@ workloads:
             value: "<api key>"
             env: <env_var>
     encryption_key: "<key>"
-    authentication:
-      type: "spiffe"
-      config:
-        trust_domain: "spiffe://example.org/"
-        endpoint: "unix:///tmp/spire-agent/public/api.sock"
-        audiences:
-          - "temporal_cloud_proxy"
+#    authentication: # spiffe authentication example
+#      type: "spiffe"
+#      config:
+#        trust_domain: "spiffe://example.org/"
+#        endpoint: "unix:///tmp/spire-agent/public/api.sock"
+#        audiences:
+#          - "temporal_cloud_proxy"
+#    authentication: # jwt authentication example
+#      type: "jwt"
+#      config:
+#        jwks-url: "http://localhost:8200/v1/identity/oidc/.well-known/keys"
+#        audiences:
+#        - "temporal_cloud_proxy"

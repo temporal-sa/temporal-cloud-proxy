@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -239,24 +238,6 @@ func TestSpiffeAuthenticator_Authenticate(t *testing.T) {
 			}
 		})
 	}
-}
-
-func TestSpiffeAuthenticator_Refresh(t *testing.T) {
-	auth := &SpiffeAuthenticator{}
-	ctx := context.Background()
-
-	result := &AuthenticationResult{
-		Authenticated: true,
-		Subject:       "spiffe://example.org/service",
-		Claims:        map[string]interface{}{"aud": "service1"},
-		Expiration:    time.Now().Add(time.Hour),
-	}
-
-	refreshedResult, err := auth.Refresh(ctx, result)
-
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "refresh not applicable for SPIFFE JWT-SWIDs")
-	assert.Equal(t, result, refreshedResult) // Should return the same result
 }
 
 func TestSpiffeAuthenticator_Close(t *testing.T) {

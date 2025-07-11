@@ -27,7 +27,6 @@ import (
 
 var configFilePath string
 
-// TODO: graceful shutdown
 func main() {
 	app := &cli.App{
 		Name:  "tclp",
@@ -120,10 +119,7 @@ func configureProxy(proxyConns *proxy.Conn, cfg *utils.Config) error {
 
 			switch authType {
 			case "spiffe":
-				spiffeAuth := &auth.SpiffeAuthenticator{
-					TrustDomain: w.Authentication.Config["trust_domain"].(string),
-					Endpoint:    w.Authentication.Config["endpoint"].(string),
-				}
+				spiffeAuth := &auth.SpiffeAuthenticator{}
 
 				if audiences, ok := w.Authentication.Config["audiences"].([]interface{}); ok {
 					for _, a := range audiences {
@@ -138,6 +134,25 @@ func configureProxy(proxyConns *proxy.Conn, cfg *utils.Config) error {
 				}
 
 				if err := authManager.RegisterAuthenticator(spiffeAuth); err != nil {
+					return err
+				}
+
+			case "jwt":
+				jwtAuth := &auth.JwtAuthenticator{}
+
+				if audiences, ok := w.Authentication.Config["audiences"].([]interface{}); ok {
+					for _, a := range audiences {
+						if audience, ok := a.(string); ok {
+							jwtAuth.Audiences = append(jwtAuth.Audiences, audience)
+						}
+					}
+				}
+
+				if err := jwtAuth.Init(ctx, w.Authentication.Config); err != nil {
+					return fmt.Errorf("failed to initialize jwt authenticator: %w", err)
+				}
+
+				if err := authManager.RegisterAuthenticator(jwtAuth); err != nil {
 					return err
 				}
 
