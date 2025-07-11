@@ -119,12 +119,6 @@ func (j *JwtAuthenticator) Authenticate(ctx context.Context, credentials interfa
 		}, fmt.Errorf("invalid audience: %v", audClaim)
 	}
 
-	if !validAud {
-		return &AuthenticationResult{
-			Authenticated: false,
-		}, fmt.Errorf("invalid audience: %v", aud)
-	}
-
 	sub, ok := claims["sub"].(string)
 	if !ok {
 		return &AuthenticationResult{
