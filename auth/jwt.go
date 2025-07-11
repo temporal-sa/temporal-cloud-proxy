@@ -33,7 +33,7 @@ func (j *JwtAuthenticator) Init(ctx context.Context, config map[string]interface
 		RefreshInterval: time.Minute * 5,
 	})
 	if err != nil {
-		panic(fmt.Sprintf("failed to get JWKS: %v", err))
+		return fmt.Errorf("failed to get JWKS: %w", err)
 	}
 
 	j.jwks = jwks
