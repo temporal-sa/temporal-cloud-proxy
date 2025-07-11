@@ -140,6 +140,10 @@ func TestAuthenticatorInterface(t *testing.T) {
 			auth: &SpiffeAuthenticator{},
 		},
 		{
+			name: "JwtAuthenticator implements Authenticator",
+			auth: &JwtAuthenticator{},
+		},
+		{
 			name: "MockAuthenticator implements Authenticator",
 			auth: NewMockAuthenticator("test"),
 		},
@@ -159,7 +163,6 @@ func TestAuthenticatorInterface(t *testing.T) {
 			// We don't call them to avoid mock setup issues
 			assert.NotNil(t, tt.auth.Init)
 			assert.NotNil(t, tt.auth.Authenticate)
-			assert.NotNil(t, tt.auth.Refresh)
 			assert.NotNil(t, tt.auth.Close)
 		})
 	}

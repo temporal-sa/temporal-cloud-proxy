@@ -41,11 +41,6 @@ func (m *MockAuthenticator) Authenticate(ctx context.Context, credentials interf
 	return args.Get(0).(*AuthenticationResult), args.Error(1)
 }
 
-func (m *MockAuthenticator) Refresh(ctx context.Context, result *AuthenticationResult) (*AuthenticationResult, error) {
-	args := m.Called(ctx, result)
-	return args.Get(0).(*AuthenticationResult), args.Error(1)
-}
-
 func (m *MockAuthenticator) Close() error {
 	args := m.Called()
 	return args.Error(0)

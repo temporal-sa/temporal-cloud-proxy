@@ -4,7 +4,9 @@ go 1.24.1
 
 require (
 	cloud.google.com/go/kms v1.22.0
+	github.com/MicahParks/keyfunc v1.9.0
 	github.com/aws/aws-sdk-go v1.55.7
+	github.com/golang-jwt/jwt/v4 v4.5.2
 	github.com/googleapis/gax-go/v2 v2.14.2
 	github.com/hashicorp/golang-lru v1.0.2
 	github.com/stretchr/testify v1.10.0
@@ -12,7 +14,6 @@ require (
 	go.opentelemetry.io/otel v1.37.0
 	go.opentelemetry.io/otel/exporters/prometheus v0.59.0
 	go.opentelemetry.io/otel/metric v1.37.0
-	go.opentelemetry.io/otel/sdk v1.37.0
 	go.opentelemetry.io/otel/sdk/metric v1.37.0
 	go.temporal.io/api v1.47.0
 	go.temporal.io/sdk v1.34.0
@@ -25,6 +26,7 @@ require (
 	github.com/Microsoft/go-winio v0.6.2 // indirect
 	github.com/go-jose/go-jose/v4 v4.0.5 // indirect
 	github.com/zeebo/errs v1.4.0 // indirect
+	go.opentelemetry.io/otel/sdk v1.37.0 // indirect
 	golang.org/x/crypto v0.39.0 // indirect
 )
 
