@@ -73,21 +73,50 @@ func (j *JwtAuthenticator) Authenticate(ctx context.Context, credentials interfa
 	}
 
 	claims := token.Claims.(jwt.MapClaims)
-	var aud string
+	var audClaim interface{}
+	var validAud bool
 
-	if aud, ok = claims["aud"].(string); !ok {
+	audClaim, ok = claims["aud"]
+	if !ok {
+		return &AuthenticationResult{
+			Authenticated: false,
+		}, fmt.Errorf("audience claim missing")
+	}
+
+	switch aud := audClaim.(type) {
+	case string:
+		// Single audience case
+		for _, audience := range j.Audiences {
+			if aud == audience {
+				validAud = true
+				break
+			}
+		}
+	case []interface{}:
+		// Multi-audience case
+		for _, audItem := range aud {
+			if audStr, ok := audItem.(string); ok {
+				for _, audience := range j.Audiences {
+					if audStr == audience {
+						validAud = true
+						break
+					}
+				}
+			}
+			if validAud {
+				break
+			}
+		}
+	default:
 		return &AuthenticationResult{
 			Authenticated: false,
 		}, fmt.Errorf("invalid audience format")
 	}
 
-	validAud := false
-
-	for _, audience := range j.Audiences {
-		if aud == audience {
-			validAud = true
-			break
-		}
+	if !validAud {
+		return &AuthenticationResult{
+			Authenticated: false,
+		}, fmt.Errorf("invalid audience: %v", audClaim)
 	}
 
 	if !validAud {
