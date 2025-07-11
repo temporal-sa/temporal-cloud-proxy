@@ -92,14 +92,14 @@ func (j *JwtAuthenticator) Authenticate(ctx context.Context, credentials interfa
 	if !ok {
 		return &AuthenticationResult{
 			Authenticated: false,
-		}, fmt.Errorf("ivalid subject: %v", sub)
+		}, fmt.Errorf("invalid subject: %v", sub)
 	}
 
 	expFloat, ok := claims["exp"].(float64)
 	if !ok {
 		return &AuthenticationResult{
 			Authenticated: false,
-		}, fmt.Errorf("ivalid expiry: %v", expFloat)
+		}, fmt.Errorf("invalid expiry: %v", expFloat)
 	}
 	expiry := time.Unix(int64(expFloat), 0)
 
