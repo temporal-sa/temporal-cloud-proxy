@@ -13,12 +13,9 @@ import (
 	"net"
 	"os"
 	"sync"
+	"temporal-sa/temporal-cloud-proxy/config"
 	"testing"
 	"time"
-
-	"temporal-sa/temporal-cloud-proxy/auth"
-	"temporal-sa/temporal-cloud-proxy/metrics"
-	"temporal-sa/temporal-cloud-proxy/utils"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -27,6 +24,8 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
+	"temporal-sa/temporal-cloud-proxy/auth"
+	"temporal-sa/temporal-cloud-proxy/metrics"
 )
 
 // MockAuthManager is a mock implementation of the AuthManager interface
@@ -120,13 +119,13 @@ func TestConn_AddConn(t *testing.T) {
 		{
 			name: "successful connection addition with TLS",
 			input: AddConnInput{
-				Workload: &utils.WorkloadConfig{
+				Workload: &config.WorkloadConfig{
 					WorkloadId: "test-workload-id",
-					TemporalCloud: utils.TemporalCloudConfig{
+					TemporalCloud: config.TemporalCloudConfig{
 						Namespace: "test-namespace",
 						HostPort:  "localhost:7233",
-						Authentication: utils.TemporalAuthConfig{
-							TLS: &utils.TLSConfig{
+						Authentication: config.TemporalAuthConfig{
+							TLS: &config.TLSConfig{
 								CertFile: certPath,
 								KeyFile:  keyPath,
 							},
@@ -144,13 +143,13 @@ func TestConn_AddConn(t *testing.T) {
 		{
 			name: "successful connection addition with API key (value)",
 			input: AddConnInput{
-				Workload: &utils.WorkloadConfig{
+				Workload: &config.WorkloadConfig{
 					WorkloadId: "test-workload-id-api",
-					TemporalCloud: utils.TemporalCloudConfig{
+					TemporalCloud: config.TemporalCloudConfig{
 						Namespace: "test-namespace",
 						HostPort:  "localhost:7233",
-						Authentication: utils.TemporalAuthConfig{
-							ApiKey: &utils.TemporalApiKeyConfig{
+						Authentication: config.TemporalAuthConfig{
+							ApiKey: &config.TemporalApiKeyConfig{
 								Value: "test-api-key",
 							},
 						},
@@ -167,13 +166,13 @@ func TestConn_AddConn(t *testing.T) {
 		{
 			name: "successful connection addition with API key (env var)",
 			input: AddConnInput{
-				Workload: &utils.WorkloadConfig{
+				Workload: &config.WorkloadConfig{
 					WorkloadId: "test-workload-id-api-env",
-					TemporalCloud: utils.TemporalCloudConfig{
+					TemporalCloud: config.TemporalCloudConfig{
 						Namespace: "test-namespace",
 						HostPort:  "localhost:7233",
-						Authentication: utils.TemporalAuthConfig{
-							ApiKey: &utils.TemporalApiKeyConfig{
+						Authentication: config.TemporalAuthConfig{
+							ApiKey: &config.TemporalApiKeyConfig{
 								EnvVar: "TEST_TEMPORAL_API_KEY",
 							},
 						},
@@ -190,13 +189,13 @@ func TestConn_AddConn(t *testing.T) {
 		{
 			name: "invalid certificate path",
 			input: AddConnInput{
-				Workload: &utils.WorkloadConfig{
+				Workload: &config.WorkloadConfig{
 					WorkloadId: "test-workload-id",
-					TemporalCloud: utils.TemporalCloudConfig{
+					TemporalCloud: config.TemporalCloudConfig{
 						Namespace: "test-namespace",
 						HostPort:  "localhost:7233",
-						Authentication: utils.TemporalAuthConfig{
-							TLS: &utils.TLSConfig{
+						Authentication: config.TemporalAuthConfig{
+							TLS: &config.TLSConfig{
 								CertFile: "/nonexistent/cert.pem",
 								KeyFile:  keyPath,
 							},
@@ -214,13 +213,13 @@ func TestConn_AddConn(t *testing.T) {
 		{
 			name: "invalid key path",
 			input: AddConnInput{
-				Workload: &utils.WorkloadConfig{
+				Workload: &config.WorkloadConfig{
 					WorkloadId: "test-workload-id",
-					TemporalCloud: utils.TemporalCloudConfig{
+					TemporalCloud: config.TemporalCloudConfig{
 						Namespace: "test-namespace",
 						HostPort:  "localhost:7233",
-						Authentication: utils.TemporalAuthConfig{
-							TLS: &utils.TLSConfig{
+						Authentication: config.TemporalAuthConfig{
+							TLS: &config.TLSConfig{
 								CertFile: certPath,
 								KeyFile:  "/nonexistent/key.pem",
 							},
@@ -238,16 +237,16 @@ func TestConn_AddConn(t *testing.T) {
 		{
 			name: "both API key and TLS configured - should error",
 			input: AddConnInput{
-				Workload: &utils.WorkloadConfig{
+				Workload: &config.WorkloadConfig{
 					WorkloadId: "test-workload-id",
-					TemporalCloud: utils.TemporalCloudConfig{
+					TemporalCloud: config.TemporalCloudConfig{
 						Namespace: "test-namespace",
 						HostPort:  "localhost:7233",
-						Authentication: utils.TemporalAuthConfig{
-							ApiKey: &utils.TemporalApiKeyConfig{
+						Authentication: config.TemporalAuthConfig{
+							ApiKey: &config.TemporalApiKeyConfig{
 								Value: "test-api-key",
 							},
-							TLS: &utils.TLSConfig{
+							TLS: &config.TLSConfig{
 								CertFile: certPath,
 								KeyFile:  keyPath,
 							},
@@ -522,13 +521,13 @@ func TestConn_ConcurrentAccess(t *testing.T) {
 			defer wg.Done()
 
 			input := AddConnInput{
-				Workload: &utils.WorkloadConfig{
+				Workload: &config.WorkloadConfig{
 					WorkloadId: fmt.Sprintf("workload-id-%d", id),
-					TemporalCloud: utils.TemporalCloudConfig{
+					TemporalCloud: config.TemporalCloudConfig{
 						Namespace: fmt.Sprintf("namespace-%d", id),
 						HostPort:  "localhost:7233",
-						Authentication: utils.TemporalAuthConfig{
-							TLS: &utils.TLSConfig{
+						Authentication: config.TemporalAuthConfig{
+							TLS: &config.TLSConfig{
 								CertFile: certPath,
 								KeyFile:  keyPath,
 							},
