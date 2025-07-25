@@ -72,8 +72,6 @@ func (t *grpcTransportProvider) Start() error {
 		zap.Int("port", t.port),
 	)
 
-	// TODO do this properly
-	t.logger.Warn("fix todo")
 	go t.grpcServer.Serve(lis)
 
 	return nil

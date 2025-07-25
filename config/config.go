@@ -11,6 +11,12 @@ const (
 	ConfigPathFlag    = "config"
 	DefaultConfigPath = "config.yaml"
 	LogLevelFlag      = "level"
+
+	AwsRegionEnvVar  = "AWS_REGION"
+	DefaultAwsRegion = "us-west-2"
+
+	GcpRegionEnvVar  = "GCP_REGION"
+	DefaultGcpRegion = "us-central1"
 )
 
 type (
@@ -19,10 +25,10 @@ type (
 	}
 
 	ProxyConfig struct {
-		Server     ServerConfig     `yaml:"server"`
-		Metrics    MetricsConfig    `yaml:"metrics"`
-		Encryption EncryptionConfig `yaml:"encryption"`
-		Workloads  []WorkloadConfig `yaml:"workloads"`
+		Server     ServerConfig           `yaml:"server"`
+		Metrics    MetricsConfig          `yaml:"metrics"`
+		Encryption GlobalEncryptionConfig `yaml:"encryption"`
+		Workloads  []WorkloadConfig       `yaml:"workloads"`
 	}
 
 	ServerConfig struct {
@@ -34,7 +40,7 @@ type (
 		Port int `yaml:"port"`
 	}
 
-	EncryptionConfig struct {
+	GlobalEncryptionConfig struct {
 		Caching CachingConfig `yaml:"caching"`
 	}
 
@@ -45,10 +51,11 @@ type (
 	}
 
 	WorkloadConfig struct {
-		WorkloadId     string              `yaml:"workload_id"`
-		TemporalCloud  TemporalCloudConfig `yaml:"temporal_cloud"`
-		EncryptionKey  string              `yaml:"encryption_key"`
-		Authentication *AuthConfig         `yaml:"authentication,omitempty"`
+		WorkloadId    string              `yaml:"workload_id"`
+		TemporalCloud TemporalCloudConfig `yaml:"temporal_cloud"`
+		//EncryptionKey  string              `yaml:"encryption_key"`
+		Encryption     *EncryptionConfig `yaml:"encryption,omitempty"`
+		Authentication *AuthConfig       `yaml:"authentication,omitempty"`
 	}
 
 	TemporalCloudConfig struct {
@@ -73,6 +80,11 @@ type (
 	}
 
 	AuthConfig struct {
+		Type   string                 `yaml:"type"`
+		Config map[string]interface{} `yaml:"config"`
+	}
+
+	EncryptionConfig struct {
 		Type   string                 `yaml:"type"`
 		Config map[string]interface{} `yaml:"config"`
 	}

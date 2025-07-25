@@ -75,5 +75,5 @@ func (h *httpPromMetricsProvider) getHostPort() string {
 }
 
 func (h *httpPromMetricsProvider) getHostPortPath() string {
-	return fmt.Sprintf("%s:%d/%s", h.host, h.port, h.path)
+	return fmt.Sprintf("%s:%d%s", h.host, h.port, h.path)
 }

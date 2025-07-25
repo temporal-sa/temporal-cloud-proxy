@@ -8,6 +8,7 @@ import (
 	"os/signal"
 	"syscall"
 	"temporal-sa/temporal-cloud-proxy/auth"
+	"temporal-sa/temporal-cloud-proxy/codec"
 	"temporal-sa/temporal-cloud-proxy/config"
 	"temporal-sa/temporal-cloud-proxy/metrics"
 	"temporal-sa/temporal-cloud-proxy/proxy"
@@ -48,22 +49,34 @@ func buildCLIOptions() *cli.App {
 }
 
 func startProxy(c *cli.Context) error {
-	// var logCfg log.Config
-	if logLevel := c.String(config.LogLevelFlag); len(logLevel) != 0 {
-		// logCfg.Level = logLevel
+	var logger *zap.Logger
+
+	switch c.String(config.LogLevelFlag) {
+	case "debug":
+		logger, _ = zap.NewDevelopment()
+	case "info":
+		fallthrough
+	case "warn":
+		fallthrough
+	case "error":
+		fallthrough
+	default:
+		logger, _ = zap.NewProduction()
+
 	}
 
 	app := fx.New(
 		fx.Provide(
-			zap.NewExample,
+			func() *zap.Logger { return logger },
 			func() *cli.Context { return c },
 			func() context.Context { return c.Context },
 		),
 
-		config.Module,
-		metrics.Module,
 		auth.Module,
-		// encryption.Module, // TODO
+		codec.Module,
+		config.Module,
+		//crypto.Module,
+		metrics.Module,
 		proxy.Module,
 		transport.Module,
 

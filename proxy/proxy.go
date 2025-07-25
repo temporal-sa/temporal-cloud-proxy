@@ -5,9 +5,6 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/kms"
 	"go.opentelemetry.io/otel/attribute"
 	"go.temporal.io/sdk/converter"
 	"go.uber.org/zap"
@@ -21,9 +18,7 @@ import (
 	"temporal-sa/temporal-cloud-proxy/auth"
 	"temporal-sa/temporal-cloud-proxy/codec"
 	"temporal-sa/temporal-cloud-proxy/config"
-	"temporal-sa/temporal-cloud-proxy/crypto"
 	"temporal-sa/temporal-cloud-proxy/metrics"
-	"time"
 )
 
 type (
@@ -52,25 +47,11 @@ type (
 	}
 )
 
-func newProxyProvider(configProvider config.ConfigProvider, logger *zap.Logger, authFactory auth.AuthenticatorFactory) ProxyProvider {
+func newProxyProvider(configProvider config.ConfigProvider, logger *zap.Logger,
+	authFactory auth.AuthenticatorFactory, codecFactory codec.EncryptionCodecFactory) ProxyProvider {
 	proxy := &proxyServer{
 		connectionMux: make(map[string]MuxConnection),
 		logger:        logger,
-	}
-
-	var cachingConfig *crypto.CachingConfig
-
-	providerCacheCfg := configProvider.GetProxyConfig().Encryption.Caching
-	if providerCacheCfg.MaxCache > 0 || providerCacheCfg.MaxAge != "" || providerCacheCfg.MaxUsage > 0 {
-		cachingConfig = &crypto.CachingConfig{
-			MaxCache:        providerCacheCfg.MaxCache,
-			MaxMessagesUsed: providerCacheCfg.MaxUsage,
-		}
-		if providerCacheCfg.MaxAge != "" {
-			if duration, err := time.ParseDuration(providerCacheCfg.MaxAge); err == nil {
-				cachingConfig.MaxAge = duration
-			}
-		}
 	}
 
 	for _, w := range configProvider.GetProxyConfig().Workloads {
@@ -82,10 +63,12 @@ func newProxyProvider(configProvider config.ConfigProvider, logger *zap.Logger, 
 		_, exists := proxy.connectionMux[w.WorkloadId]
 		proxy.mu.RUnlock()
 		if exists {
+			// TODO: validation should be done in the config provider
 			logger.Fatal("workload already exists", zap.String("workload-id", w.WorkloadId))
 		}
 
 		// only support one type of namespace auth
+		// TODO: validation should be done in the config provider
 		if w.TemporalCloud.Authentication.ApiKey != nil && w.TemporalCloud.Authentication.TLS != nil {
 			logger.Fatal("cannot have both api key and mtls authentication configured on a single workload",
 				zap.String("workload-id", w.WorkloadId))
@@ -93,24 +76,22 @@ func newProxyProvider(configProvider config.ConfigProvider, logger *zap.Logger, 
 
 		nsConn := &namespaceConnection{}
 
+		// configure worker auth
 		authenticator, err := authFactory.NewAuthenticator(*w.Authentication)
 		if err != nil {
-			logger.Fatal("failed to create authenticator", zap.Error(err))
+			logger.Fatal("failed to create authenticator",
+				zap.String("workload-id", w.WorkloadId), zap.Error(err))
 		}
 		nsConn.auth = &authenticator
 
-		//
-		// -----------------
 		var grpcInterceptors []grpc.UnaryClientInterceptor
-
-		// configure payload encryption
-		kmsClient := createKMSClient()
 
 		codecContext := map[string]string{
 			"namespace": w.TemporalCloud.Namespace,
 		}
 
-		// configure metrics handler
+		// configure encryption/decryption codec
+		// configure encryption metrics handler
 		metricsHandler := metrics.NewMetricsHandler(metrics.MetricsHandlerOptions{
 			// Todo: do we need these many attributes?
 			InitialAttributes: attribute.NewSet(
@@ -118,26 +99,34 @@ func newProxyProvider(configProvider config.ConfigProvider, logger *zap.Logger, 
 				attribute.String("namespace", w.TemporalCloud.Namespace),
 				attribute.String("host_port", w.TemporalCloud.HostPort),
 				attribute.String("auth_type", w.Authentication.Type),
-				attribute.String("encryption_key", w.EncryptionKey),
+				//attribute.String("encryption_key", w.EncryptionKey),
 			),
 		})
 
-		clientInterceptor, err := converter.NewPayloadCodecGRPCClientInterceptor(
-			converter.PayloadCodecGRPCClientInterceptorOptions{
-				Codecs: []converter.PayloadCodec{codec.NewEncryptionCodecWithCaching(
-					kmsClient,
-					codecContext,
-					w.EncryptionKey,
-					metricsHandler,
-					cachingConfig,
-				)},
-			},
-		)
+		encryptionCodec, err := codecFactory.NewEncryptionCodec(codec.EncryptionCodecOptions{
+			LocalEncryptionConfig: *w.Encryption,
+			CodecContext:          codecContext,
+			MetricsHandler:        &metricsHandler,
+		})
 		if err != nil {
-			logger.Fatal("failed to create client interceptor",
+			logger.Fatal("failed to create encryption codec",
 				zap.String("workload-id", w.WorkloadId), zap.Error(err))
 		}
-		grpcInterceptors = append(grpcInterceptors, clientInterceptor)
+
+		if encryptionCodec != nil {
+			encryptionInterceptor, err := converter.NewPayloadCodecGRPCClientInterceptor(
+				converter.PayloadCodecGRPCClientInterceptorOptions{
+					Codecs: []converter.PayloadCodec{encryptionCodec},
+				},
+			)
+			if err != nil {
+				logger.Fatal("failed to create client interceptor",
+					zap.String("workload-id", w.WorkloadId), zap.Error(err))
+			}
+			if encryptionInterceptor != nil {
+				grpcInterceptors = append(grpcInterceptors, encryptionInterceptor)
+			}
+		}
 
 		// set api key or mTLS auth on the namesapce connection
 		tlsConfig, authInterceptor, err := setNamespaceAuth(w, logger)
@@ -213,21 +202,6 @@ func (p *proxyServer) Stop() error {
 	}
 
 	return errors.Join(errs...)
-}
-
-// createKMSClient creates an AWS KMS client
-func createKMSClient() *kms.KMS {
-	// Use the region from parameter or environment variable
-	region := os.Getenv("AWS_REGION")
-	if region == "" {
-		region = "us-west-2" // Default region
-	}
-
-	sess := session.Must(session.NewSession(&aws.Config{
-		Region: aws.String(region),
-	}))
-
-	return kms.New(sess)
 }
 
 func setNamespaceAuth(workloadConfig config.WorkloadConfig, logger *zap.Logger) (*tls.Config, grpc.UnaryClientInterceptor, error) {
@@ -333,7 +307,7 @@ func (p *proxyServer) Invoke(ctx context.Context, method string, args interface{
 		zap.String("method", method),
 		zap.Any("args", args),
 	)
-	
+
 	return namespace.GetConnection().Invoke(ctx, method, args, reply, opts...)
 }
 

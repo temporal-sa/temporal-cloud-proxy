@@ -52,7 +52,7 @@ workloads:
 				Metrics: MetricsConfig{
 					Port: 8080,
 				},
-				Encryption: EncryptionConfig{
+				Encryption: GlobalEncryptionConfig{
 					Caching: CachingConfig{
 						MaxCache: 100,
 						MaxAge:   "1h",
@@ -112,7 +112,7 @@ workloads:
 				Metrics: MetricsConfig{
 					Port: 9090,
 				},
-				Encryption: EncryptionConfig{
+				Encryption: GlobalEncryptionConfig{
 					Caching: CachingConfig{},
 				},
 				Workloads: []WorkloadConfig{
@@ -160,7 +160,7 @@ workloads:
 				Metrics: MetricsConfig{
 					Port: 9090,
 				},
-				Encryption: EncryptionConfig{
+				Encryption: GlobalEncryptionConfig{
 					Caching: CachingConfig{},
 				},
 				Workloads: []WorkloadConfig{
@@ -225,7 +225,7 @@ workloads:
 				Metrics: MetricsConfig{
 					Port: 8081,
 				},
-				Encryption: EncryptionConfig{
+				Encryption: GlobalEncryptionConfig{
 					Caching: CachingConfig{
 						MaxCache: 50,
 					},
@@ -482,12 +482,12 @@ func TestMetricsConfig_Structure(t *testing.T) {
 func TestEncryptionConfig_Structure(t *testing.T) {
 	tests := []struct {
 		name   string
-		config EncryptionConfig
+		config GlobalEncryptionConfig
 		want   CachingConfig
 	}{
 		{
 			name: "full caching config",
-			config: EncryptionConfig{
+			config: GlobalEncryptionConfig{
 				Caching: CachingConfig{
 					MaxCache: 100,
 					MaxAge:   "1h",
@@ -502,7 +502,7 @@ func TestEncryptionConfig_Structure(t *testing.T) {
 		},
 		{
 			name: "partial caching config",
-			config: EncryptionConfig{
+			config: GlobalEncryptionConfig{
 				Caching: CachingConfig{
 					MaxCache: 50,
 				},
@@ -513,7 +513,7 @@ func TestEncryptionConfig_Structure(t *testing.T) {
 		},
 		{
 			name: "empty caching config",
-			config: EncryptionConfig{
+			config: GlobalEncryptionConfig{
 				Caching: CachingConfig{},
 			},
 			want: CachingConfig{},
