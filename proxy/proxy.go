@@ -77,12 +77,18 @@ func newProxyProvider(configProvider config.ConfigProvider, logger *zap.Logger,
 		nsConn := &namespaceConnection{}
 
 		// configure worker auth
-		authenticator, err := authFactory.NewAuthenticator(*w.Authentication)
-		if err != nil {
-			logger.Fatal("failed to create authenticator",
-				zap.String("workload-id", w.WorkloadId), zap.Error(err))
+		if w.Authentication == nil {
+			logger.Warn("workload configured without worker authentication",
+				zap.String("workload-id", w.WorkloadId))
 		}
-		nsConn.auth = &authenticator
+		if w.Authentication != nil {
+			authenticator, err := authFactory.NewAuthenticator(*w.Authentication)
+			if err != nil {
+				logger.Fatal("failed to create authenticator",
+					zap.String("workload-id", w.WorkloadId), zap.Error(err))
+			}
+			nsConn.auth = &authenticator
+		}
 
 		var grpcInterceptors []grpc.UnaryClientInterceptor
 
@@ -98,33 +104,39 @@ func newProxyProvider(configProvider config.ConfigProvider, logger *zap.Logger,
 				attribute.String("workload_id", w.WorkloadId),
 				attribute.String("namespace", w.TemporalCloud.Namespace),
 				attribute.String("host_port", w.TemporalCloud.HostPort),
-				attribute.String("auth_type", w.Authentication.Type),
+				//attribute.String("auth_type", w.Authentication.Type),
 				//attribute.String("encryption_key", w.EncryptionKey),
 			),
 		})
 
-		encryptionCodec, err := codecFactory.NewEncryptionCodec(codec.EncryptionCodecOptions{
-			LocalEncryptionConfig: *w.Encryption,
-			CodecContext:          codecContext,
-			MetricsHandler:        &metricsHandler,
-		})
-		if err != nil {
-			logger.Fatal("failed to create encryption codec",
-				zap.String("workload-id", w.WorkloadId), zap.Error(err))
+		if w.Encryption == nil {
+			logger.Warn("workload configured without payload encryption",
+				zap.String("workload-id", w.WorkloadId))
 		}
-
-		if encryptionCodec != nil {
-			encryptionInterceptor, err := converter.NewPayloadCodecGRPCClientInterceptor(
-				converter.PayloadCodecGRPCClientInterceptorOptions{
-					Codecs: []converter.PayloadCodec{encryptionCodec},
-				},
-			)
+		if w.Encryption != nil {
+			encryptionCodec, err := codecFactory.NewEncryptionCodec(codec.EncryptionCodecOptions{
+				LocalEncryptionConfig: *w.Encryption,
+				CodecContext:          codecContext,
+				MetricsHandler:        &metricsHandler,
+			})
 			if err != nil {
-				logger.Fatal("failed to create client interceptor",
+				logger.Fatal("failed to create encryption codec",
 					zap.String("workload-id", w.WorkloadId), zap.Error(err))
 			}
-			if encryptionInterceptor != nil {
-				grpcInterceptors = append(grpcInterceptors, encryptionInterceptor)
+
+			if encryptionCodec != nil {
+				encryptionInterceptor, err := converter.NewPayloadCodecGRPCClientInterceptor(
+					converter.PayloadCodecGRPCClientInterceptorOptions{
+						Codecs: []converter.PayloadCodec{encryptionCodec},
+					},
+				)
+				if err != nil {
+					logger.Fatal("failed to create client interceptor",
+						zap.String("workload-id", w.WorkloadId), zap.Error(err))
+				}
+				if encryptionInterceptor != nil {
+					grpcInterceptors = append(grpcInterceptors, encryptionInterceptor)
+				}
 			}
 		}
 
@@ -164,6 +176,9 @@ func (n *namespaceConnection) GetConnection() grpc.ClientConnInterface {
 }
 
 func (n *namespaceConnection) GetAuthenticator() auth.Authenticator {
+	if n.auth == nil {
+		return nil
+	}
 	return *n.auth
 }
 
@@ -244,7 +259,7 @@ func setNamespaceAuth(workloadConfig config.WorkloadConfig, logger *zap.Logger) 
 
 				return invoker(ctx, method, req, reply, cc, opts...)
 			}
-	} else {
+	} else if workloadConfig.TemporalCloud.Authentication.TLS != nil {
 		//
 		//	Configure mTLS auth
 		//
@@ -255,6 +270,9 @@ func setNamespaceAuth(workloadConfig config.WorkloadConfig, logger *zap.Logger) 
 		}
 
 		tlsConfig.Certificates = []tls.Certificate{cert}
+	} else {
+		// Passthrough. Useful if the client/worker is setting the API. Note: will not work with
+		// mTLS configured at the client/worker.
 	}
 
 	return tlsConfig, grpcInterceptor, nil
@@ -306,6 +324,7 @@ func (p *proxyServer) Invoke(ctx context.Context, method string, args interface{
 		zap.String("workload-id", workloadId[0]),
 		zap.String("method", method),
 		zap.Any("args", args),
+		zap.Any("md", md),
 	)
 
 	return namespace.GetConnection().Invoke(ctx, method, args, reply, opts...)

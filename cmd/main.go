@@ -75,7 +75,6 @@ func startProxy(c *cli.Context) error {
 		auth.Module,
 		codec.Module,
 		config.Module,
-		//crypto.Module,
 		metrics.Module,
 		proxy.Module,
 		transport.Module,
