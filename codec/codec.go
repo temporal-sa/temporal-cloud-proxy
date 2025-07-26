@@ -7,6 +7,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	awsKms "github.com/aws/aws-sdk-go/service/kms"
+	"go.opentelemetry.io/otel/attribute"
 	"go.temporal.io/sdk/converter"
 	"os"
 	"temporal-sa/temporal-cloud-proxy/config"
@@ -88,6 +89,8 @@ func newCodecFactoryProvider(configProvider config.ConfigProvider) (EncryptionCo
 			KeySpec: "AES_256",
 		})
 
+		args.MetricsHandler.AddAttributes(attribute.String("encryption_key", keyId))
+
 		return NewEncryptionCodecWithCaching(
 			awsMaterialsManager,
 			args.CodecContext,
@@ -102,7 +105,7 @@ func newCodecFactoryProvider(configProvider config.ConfigProvider) (EncryptionCo
 		if !ok {
 			return nil, fmt.Errorf("key not found in config")
 		}
-		keyId, ok := rawKeyName.(string)
+		keyName, ok := rawKeyName.(string)
 		if !ok {
 			return nil, fmt.Errorf("key is not a string")
 		}
@@ -118,14 +121,16 @@ func newCodecFactoryProvider(configProvider config.ConfigProvider) (EncryptionCo
 		}
 
 		gcpMaterialsManager := crypto.NewGCPKMSProvider(kmsClient, crypto.GCPKMSOptions{
-			KeyName:   keyId,
+			KeyName:   keyName,
 			Algorithm: "AES_256",
 		})
+
+		args.MetricsHandler.AddAttributes(attribute.String("encryption_key", keyName))
 
 		return NewEncryptionCodecWithCaching(
 			gcpMaterialsManager,
 			args.CodecContext,
-			keyId,
+			keyName,
 			args.MetricsHandler,
 			cf.cachingConfig,
 		), nil

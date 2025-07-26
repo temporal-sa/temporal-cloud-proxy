@@ -45,7 +45,7 @@ type (
 )
 
 func newProxyProvider(configProvider config.ConfigProvider, logger *zap.Logger,
-	authFactory auth.AuthenticatorFactory, codecFactory codec.EncryptionCodecFactory) ProxyProvider {
+	authFactory auth.AuthenticatorFactory, codecFactory codec.EncryptionCodecFactory) (ProxyProvider, error) {
 	proxy := &proxyServer{
 		connectionMux:  make(map[string]namespaceConnection),
 		logger:         logger,
@@ -57,20 +57,6 @@ func newProxyProvider(configProvider config.ConfigProvider, logger *zap.Logger,
 			zap.String("workload-id", w.WorkloadId),
 			zap.String("namespace", w.TemporalCloud.Namespace),
 		)
-		proxy.mu.RLock()
-		_, exists := proxy.connectionMux[w.WorkloadId]
-		proxy.mu.RUnlock()
-		if exists {
-			// TODO: validation should be done in the config provider
-			logger.Fatal("workload already exists", zap.String("workload-id", w.WorkloadId))
-		}
-
-		// only support one type of namespace auth
-		// TODO: validation should be done in the config provider
-		if w.TemporalCloud.Authentication.ApiKey != nil && w.TemporalCloud.Authentication.TLS != nil {
-			logger.Fatal("cannot have both api key and mtls authentication configured on a single workload",
-				zap.String("workload-id", w.WorkloadId))
-		}
 
 		nsConn := &namespaceConnection{
 			metricsHandler: metrics.NewMetricsHandler(metrics.MetricsHandlerOptions{
@@ -89,44 +75,51 @@ func newProxyProvider(configProvider config.ConfigProvider, logger *zap.Logger,
 		if w.Authentication != nil {
 			authenticator, err := authFactory.NewAuthenticator(*w.Authentication)
 			if err != nil {
-				logger.Fatal("failed to create authenticator",
+				logger.Error("failed to create authenticator",
 					zap.String("workload-id", w.WorkloadId), zap.Error(err))
+				return nil, fmt.Errorf(
+					"failed to create authenticator for workload %s, %w", w.WorkloadId, err)
 			}
 			nsConn.auth = &authenticator
 		}
 
 		var grpcInterceptors []grpc.UnaryClientInterceptor
 
-		codecContext := map[string]string{
-			"namespace": w.TemporalCloud.Namespace,
-		}
-
 		// configure encryption/decryption codec
-		// configure encryption metrics handler
-		metricsHandler := metrics.NewMetricsHandler(metrics.MetricsHandlerOptions{
-			// Todo: do we need these many attributes?
-			InitialAttributes: attribute.NewSet(
-				attribute.String("workload_id", w.WorkloadId),
-				attribute.String("namespace", w.TemporalCloud.Namespace),
-				attribute.String("host_port", w.TemporalCloud.HostPort),
-				//attribute.String("auth_type", w.Authentication.Type),
-				//attribute.String("encryption_key", w.EncryptionKey),
-			),
-		})
-
 		if w.Encryption == nil {
 			logger.Warn("workload configured without payload encryption",
 				zap.String("workload-id", w.WorkloadId))
 		}
 		if w.Encryption != nil {
+			// configure encryption metrics handler
+			attributes := []attribute.KeyValue{
+				attribute.String("workload_id", w.WorkloadId),
+				attribute.String("namespace", w.TemporalCloud.Namespace),
+				attribute.String("host_port", w.TemporalCloud.HostPort),
+			}
+			if w.Authentication != nil {
+				attributes = append(attributes, attribute.String("auth_type", w.Authentication.Type))
+			}
+
+			metricsHandler := metrics.NewMetricsHandler(metrics.MetricsHandlerOptions{
+				InitialAttributes: attribute.NewSet(
+					attributes...,
+					// Note: encryption codec adds additional attributes
+				),
+			})
+
 			encryptionCodec, err := codecFactory.NewEncryptionCodec(codec.EncryptionCodecOptions{
 				LocalEncryptionConfig: *w.Encryption,
-				CodecContext:          codecContext,
 				MetricsHandler:        &metricsHandler,
+				CodecContext: map[string]string{
+					"namespace": w.TemporalCloud.Namespace,
+				},
 			})
 			if err != nil {
-				logger.Fatal("failed to create encryption codec",
+				logger.Error("failed to create encryption codec",
 					zap.String("workload-id", w.WorkloadId), zap.Error(err))
+				return nil, fmt.Errorf(
+					"failed to create encryption codec for workload %s, %w", w.WorkloadId, err)
 			}
 
 			if encryptionCodec != nil {
@@ -136,8 +129,10 @@ func newProxyProvider(configProvider config.ConfigProvider, logger *zap.Logger,
 					},
 				)
 				if err != nil {
-					logger.Fatal("failed to create client interceptor",
+					logger.Error("failed to create client interceptor",
 						zap.String("workload-id", w.WorkloadId), zap.Error(err))
+					return nil, fmt.Errorf(
+						"failed to create client interceptor for workload %s, %w", w.WorkloadId, err)
 				}
 				if encryptionInterceptor != nil {
 					grpcInterceptors = append(grpcInterceptors, encryptionInterceptor)
@@ -145,10 +140,13 @@ func newProxyProvider(configProvider config.ConfigProvider, logger *zap.Logger,
 			}
 		}
 
-		// set api key or mTLS auth on the namesapce connection
+		// set api key or mTLS auth on the namespace connection
 		tlsConfig, authInterceptor, err := setNamespaceAuth(w, logger)
 		if err != nil {
-			logger.Fatal("failed to set namespace auth", zap.Error(err))
+			logger.Error("failed to set namespace auth",
+				zap.String("workload-id", w.WorkloadId), zap.Error(err))
+			return nil, fmt.Errorf(
+				"failed to set namespace auth for workload %s, %w", w.WorkloadId, err)
 		}
 		if authInterceptor != nil {
 			grpcInterceptors = append(grpcInterceptors, authInterceptor)
@@ -162,8 +160,10 @@ func newProxyProvider(configProvider config.ConfigProvider, logger *zap.Logger,
 			grpc.WithChainUnaryInterceptor(grpcInterceptors...),
 		)
 		if err != nil {
-			logger.Fatal("failed to create grpc client",
+			logger.Error("failed to create grpc client",
 				zap.String("workload-id", w.WorkloadId), zap.Error(err))
+			return nil, fmt.Errorf(
+				"failed to create grpc client for workload %s, %w", w.WorkloadId, err)
 		}
 
 		nsConn.conn = conn
@@ -173,7 +173,7 @@ func newProxyProvider(configProvider config.ConfigProvider, logger *zap.Logger,
 		proxy.mu.Unlock()
 	}
 
-	return proxy
+	return proxy, nil
 }
 
 func (n *namespaceConnection) GetConnection() grpc.ClientConnInterface {
@@ -188,17 +188,18 @@ func (n *namespaceConnection) GetAuthenticator() auth.Authenticator {
 }
 
 func (n *namespaceConnection) Close() error {
-	// TODO don't be lazy, close authenticator too if this fails
+	var errs []error
+
 	if err := n.conn.Close(); err != nil {
-		return err
+		errs = append(errs, err)
 	}
 	if n.auth != nil {
 		if err := n.GetAuthenticator().Close(); err != nil {
-			return err
+			errs = append(errs, err)
 		}
 	}
 
-	return nil
+	return errors.Join(errs...)
 }
 
 func (p *proxyServer) GetConnectionMux() grpc.ClientConnInterface {
@@ -233,7 +234,7 @@ func setNamespaceAuth(workloadConfig config.WorkloadConfig, logger *zap.Logger) 
 		//	Configure API key auth
 		//
 		if apiKeyConfig.Value != "" && apiKeyConfig.EnvVar != "" {
-			logger.Warn("multiple values provided for api key, using value",
+			logger.Warn("both value and envvar provider for api key; using value",
 				zap.String("workload-id", workloadConfig.WorkloadId))
 		}
 

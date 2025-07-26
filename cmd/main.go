@@ -2,8 +2,10 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 	"os"
 	"os/signal"
 	"syscall"
@@ -49,25 +51,25 @@ func buildCLIOptions() *cli.App {
 }
 
 func startProxy(c *cli.Context) error {
-	var logger *zap.Logger
+	logLevel := c.String(config.LogLevelFlag)
 
-	switch c.String(config.LogLevelFlag) {
-	case "debug":
-		logger, _ = zap.NewDevelopment()
-	case "info":
-		fallthrough
-	case "warn":
-		fallthrough
-	case "error":
-		fallthrough
-	default:
-		logger, _ = zap.NewProduction()
+	var zapLevel zapcore.Level
+	if err := zapLevel.UnmarshalText([]byte(logLevel)); err != nil {
+		return fmt.Errorf("invalid log level %q: %w", logLevel, err)
+	}
 
+	loggerConfig := zap.NewProductionConfig()
+	loggerConfig.Level.SetLevel(zapLevel)
+	logger, err := loggerConfig.Build()
+	if err != nil {
+		return fmt.Errorf("failed to initialise logger: %w", err)
 	}
 
 	app := fx.New(
 		fx.Provide(
-			func() *zap.Logger { return logger },
+			func() *zap.Logger {
+				return logger
+			},
 			func() *cli.Context { return c },
 			func() context.Context { return c.Context },
 		),
