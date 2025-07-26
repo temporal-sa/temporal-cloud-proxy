@@ -19,6 +19,7 @@ import (
 	"temporal-sa/temporal-cloud-proxy/codec"
 	"temporal-sa/temporal-cloud-proxy/config"
 	"temporal-sa/temporal-cloud-proxy/metrics"
+	"time"
 )
 
 type (
@@ -28,30 +29,27 @@ type (
 		Stop() error
 	}
 
-	MuxConnection interface {
-		GetConnection() grpc.ClientConnInterface
-		GetAuthenticator() auth.Authenticator
-		Close() error
-	}
-
 	proxyServer struct {
 		grpc.ClientConnInterface
-		connectionMux map[string]MuxConnection
-		mu            sync.RWMutex
-		logger        *zap.Logger
+		connectionMux  map[string]namespaceConnection
+		mu             sync.RWMutex
+		logger         *zap.Logger
+		metricsHandler metrics.MetricsHandler
 	}
 
 	namespaceConnection struct {
-		conn *grpc.ClientConn
-		auth *auth.Authenticator
+		conn           *grpc.ClientConn
+		auth           *auth.Authenticator
+		metricsHandler metrics.MetricsHandler
 	}
 )
 
 func newProxyProvider(configProvider config.ConfigProvider, logger *zap.Logger,
 	authFactory auth.AuthenticatorFactory, codecFactory codec.EncryptionCodecFactory) ProxyProvider {
 	proxy := &proxyServer{
-		connectionMux: make(map[string]MuxConnection),
-		logger:        logger,
+		connectionMux:  make(map[string]namespaceConnection),
+		logger:         logger,
+		metricsHandler: metrics.NewMetricsHandler(metrics.MetricsHandlerOptions{}),
 	}
 
 	for _, w := range configProvider.GetProxyConfig().Workloads {
@@ -74,7 +72,14 @@ func newProxyProvider(configProvider config.ConfigProvider, logger *zap.Logger,
 				zap.String("workload-id", w.WorkloadId))
 		}
 
-		nsConn := &namespaceConnection{}
+		nsConn := &namespaceConnection{
+			metricsHandler: metrics.NewMetricsHandler(metrics.MetricsHandlerOptions{
+				InitialAttributes: attribute.NewSet(
+					attribute.String("workload_id", w.WorkloadId),
+					attribute.String("namespace", w.TemporalCloud.Namespace),
+				),
+			}),
+		}
 
 		// configure worker auth
 		if w.Authentication == nil {
@@ -164,7 +169,7 @@ func newProxyProvider(configProvider config.ConfigProvider, logger *zap.Logger,
 		nsConn.conn = conn
 
 		proxy.mu.Lock()
-		proxy.connectionMux[w.WorkloadId] = nsConn
+		proxy.connectionMux[w.WorkloadId] = *nsConn
 		proxy.mu.Unlock()
 	}
 
@@ -280,17 +285,23 @@ func setNamespaceAuth(workloadConfig config.WorkloadConfig, logger *zap.Logger) 
 
 // Invoke implements the grpc.ClientConnInterface Invoke method
 func (p *proxyServer) Invoke(ctx context.Context, method string, args interface{}, reply interface{}, opts ...grpc.CallOption) error {
+	start := time.Now()
+	p.metricsHandler.Counter(metrics.ProxyRequestTotal).Inc(1)
+
 	md, ok := metadata.FromIncomingContext(ctx)
 	if !ok {
+		p.metricsHandler.WithTags(map[string]string{"error": "unable to read metadata"}).Counter(metrics.ProxyRequestErrors).Inc(1)
 		return status.Errorf(codes.InvalidArgument, "unable to read metadata")
 	}
 
 	workloadId := md.Get("workload-id")
 
 	if len(workloadId) <= 0 {
+		p.metricsHandler.WithTags(map[string]string{"error": "metadata missing workload-id"}).Counter(metrics.ProxyRequestErrors).Inc(1)
 		return status.Error(codes.InvalidArgument, "metadata missing workload-id")
 	}
 	if len(workloadId) != 1 {
+		p.metricsHandler.WithTags(map[string]string{"error": "metadata contains multiple workload-id entries"}).Counter(metrics.ProxyRequestErrors).Inc(1)
 		return status.Error(codes.InvalidArgument, "metadata contains multiple workload-id entries")
 	}
 
@@ -299,23 +310,29 @@ func (p *proxyServer) Invoke(ctx context.Context, method string, args interface{
 	p.mu.RUnlock()
 
 	if !exists {
-		return status.Errorf(codes.InvalidArgument, "invalid workload-id: %s", workloadId[0])
+		p.logger.Warn("invalid workload-id", zap.String("workload-id", workloadId[0]))
+		p.metricsHandler.WithTags(map[string]string{"error": "invalid workload-id"}).Counter(metrics.ProxyRequestErrors).Inc(1)
+		return status.Errorf(codes.InvalidArgument, "invalid workload-id")
 	}
 
 	if namespace.GetAuthenticator() != nil {
 		authorization := md.Get("authorization")
 
 		if len(authorization) < 1 {
+			namespace.metricsHandler.WithTags(map[string]string{"error": "metadata is missing authorization"}).Counter(metrics.ProxyRequestErrors).Inc(1)
 			return status.Error(codes.InvalidArgument, "metadata is missing authorization")
 		} else if len(authorization) > 1 {
+			namespace.metricsHandler.WithTags(map[string]string{"error": "metadata contains multiple authorization entries"}).Counter(metrics.ProxyRequestErrors).Inc(1)
 			return status.Error(codes.InvalidArgument, "metadata contains multiple authorization entries")
 		}
 
 		result, err := namespace.GetAuthenticator().Authenticate(ctx, authorization[0])
 		if err != nil {
-			return status.Errorf(codes.Unknown, "failed to authenticate: %s", err)
+			namespace.metricsHandler.WithTags(map[string]string{"error": "failed to authenticate"}).Counter(metrics.ProxyRequestErrors).Inc(1)
+			return status.Errorf(codes.Unknown, fmt.Sprintf("failed to authenticate: %s", err))
 		}
 		if !result.Authenticated {
+			namespace.metricsHandler.WithTags(map[string]string{"error": "invalid token"}).Counter(metrics.ProxyRequestErrors).Inc(1)
 			return status.Errorf(codes.Unauthenticated, "invalid token")
 		}
 	}
@@ -327,6 +344,8 @@ func (p *proxyServer) Invoke(ctx context.Context, method string, args interface{
 		zap.Any("md", md),
 	)
 
+	namespace.metricsHandler.Counter(metrics.ProxyRequestSuccess).Inc(1)
+	namespace.metricsHandler.Timer(metrics.ProxyLatency).Record(time.Since(start))
 	return namespace.GetConnection().Invoke(ctx, method, args, reply, opts...)
 }
 
