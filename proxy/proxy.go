@@ -5,6 +5,14 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"os"
+	"sync"
+	"temporal-sa/temporal-cloud-proxy/auth"
+	"temporal-sa/temporal-cloud-proxy/codec"
+	"temporal-sa/temporal-cloud-proxy/config"
+	"temporal-sa/temporal-cloud-proxy/metrics"
+	"time"
+
 	"go.opentelemetry.io/otel/attribute"
 	"go.temporal.io/sdk/converter"
 	"go.uber.org/zap"
@@ -13,13 +21,6 @@ import (
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
-	"os"
-	"sync"
-	"temporal-sa/temporal-cloud-proxy/auth"
-	"temporal-sa/temporal-cloud-proxy/codec"
-	"temporal-sa/temporal-cloud-proxy/config"
-	"temporal-sa/temporal-cloud-proxy/metrics"
-	"time"
 )
 
 type (
@@ -330,7 +331,7 @@ func (p *proxyServer) Invoke(ctx context.Context, method string, args interface{
 		result, err := namespace.GetAuthenticator().Authenticate(ctx, authorization[0])
 		if err != nil {
 			namespace.metricsHandler.WithTags(map[string]string{"error": "failed to authenticate"}).Counter(metrics.ProxyRequestErrors).Inc(1)
-			return status.Errorf(codes.Unknown, fmt.Sprintf("failed to authenticate: %s", err))
+			return status.Errorf(codes.Unknown, "failed to authenticate: %v", err)
 		}
 		if !result.Authenticated {
 			namespace.metricsHandler.WithTags(map[string]string{"error": "invalid token"}).Counter(metrics.ProxyRequestErrors).Inc(1)
