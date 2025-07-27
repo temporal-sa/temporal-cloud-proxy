@@ -303,8 +303,8 @@ make benchmark
 
 ### Example Implementations
 
-- [Temporal Worker with SPIFFE authentication](github.com/temporal-sa/temporal-proxy-spiffe-worker)
-- [Temporal Worker with JWT authentication](github.com/temporal-sa/temporal-proxy-jwt-worker)
+- [Temporal Worker with SPIFFE authentication](https://github.com/temporal-sa/temporal-proxy-spiffe-worker)
+- [Temporal Worker with JWT authentication](https://github.com/temporal-sa/temporal-proxy-jwt-worker)
 
 
 ## Debug Logging
