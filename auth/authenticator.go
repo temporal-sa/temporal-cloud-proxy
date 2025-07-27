@@ -3,8 +3,8 @@ package auth
 import (
 	"context"
 	"fmt"
+	"github.com/temporal-sa/temporal-cloud-proxy/config"
 	"go.uber.org/zap"
-	"temporal-sa/temporal-cloud-proxy/config"
 	"time"
 )
 

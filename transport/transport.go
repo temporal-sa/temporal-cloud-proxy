@@ -3,14 +3,14 @@ package transport
 import (
 	"context"
 	"fmt"
+	"github.com/temporal-sa/temporal-cloud-proxy/config"
+	"github.com/temporal-sa/temporal-cloud-proxy/proxy"
 	"go.temporal.io/api/workflowservice/v1"
 	"go.temporal.io/sdk/client"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"net"
-	"temporal-sa/temporal-cloud-proxy/config"
-	"temporal-sa/temporal-cloud-proxy/proxy"
 )
 
 type (

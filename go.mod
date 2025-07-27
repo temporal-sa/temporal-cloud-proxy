@@ -1,4 +1,4 @@
-module temporal-sa/temporal-cloud-proxy
+module github.com/temporal-sa/temporal-cloud-proxy
 
 go 1.24.1
 

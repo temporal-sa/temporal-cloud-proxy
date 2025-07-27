@@ -7,12 +7,12 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	awsKms "github.com/aws/aws-sdk-go/service/kms"
+	"github.com/temporal-sa/temporal-cloud-proxy/config"
+	"github.com/temporal-sa/temporal-cloud-proxy/crypto"
+	"github.com/temporal-sa/temporal-cloud-proxy/metrics"
 	"go.opentelemetry.io/otel/attribute"
 	"go.temporal.io/sdk/converter"
 	"os"
-	"temporal-sa/temporal-cloud-proxy/config"
-	"temporal-sa/temporal-cloud-proxy/crypto"
-	"temporal-sa/temporal-cloud-proxy/metrics"
 	"time"
 )
 

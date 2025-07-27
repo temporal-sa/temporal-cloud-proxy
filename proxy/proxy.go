@@ -5,12 +5,12 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"github.com/temporal-sa/temporal-cloud-proxy/auth"
+	"github.com/temporal-sa/temporal-cloud-proxy/codec"
+	"github.com/temporal-sa/temporal-cloud-proxy/config"
+	"github.com/temporal-sa/temporal-cloud-proxy/metrics"
 	"os"
 	"sync"
-	"temporal-sa/temporal-cloud-proxy/auth"
-	"temporal-sa/temporal-cloud-proxy/codec"
-	"temporal-sa/temporal-cloud-proxy/config"
-	"temporal-sa/temporal-cloud-proxy/metrics"
 	"time"
 
 	"go.opentelemetry.io/otel/attribute"
@@ -105,7 +105,7 @@ func newProxyProvider(configProvider config.ConfigProvider, logger *zap.Logger,
 			metricsHandler := metrics.NewMetricsHandler(metrics.MetricsHandlerOptions{
 				InitialAttributes: attribute.NewSet(
 					attributes...,
-					// Note: encryption codec adds additional attributes
+				// Note: encryption codec adds additional attributes
 				),
 			})
 

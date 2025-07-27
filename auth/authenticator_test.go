@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 
-	"temporal-sa/temporal-cloud-proxy/config"
+	"github.com/temporal-sa/temporal-cloud-proxy/config"
 )
 
 func TestNewAuthenticatorFactoryProvider(t *testing.T) {

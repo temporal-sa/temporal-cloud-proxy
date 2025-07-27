@@ -5,10 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/temporal-sa/temporal-cloud-proxy/config"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
 	"net/http"
-	"temporal-sa/temporal-cloud-proxy/config"
 )
 
 type (

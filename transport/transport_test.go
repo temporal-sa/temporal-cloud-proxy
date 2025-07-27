@@ -11,7 +11,7 @@ import (
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 
-	"temporal-sa/temporal-cloud-proxy/config"
+	"github.com/temporal-sa/temporal-cloud-proxy/config"
 )
 
 // Mock implementations

@@ -15,9 +15,9 @@ import (
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 
-	"temporal-sa/temporal-cloud-proxy/auth"
-	"temporal-sa/temporal-cloud-proxy/codec"
-	"temporal-sa/temporal-cloud-proxy/config"
+	"github.com/temporal-sa/temporal-cloud-proxy/auth"
+	"github.com/temporal-sa/temporal-cloud-proxy/codec"
+	"github.com/temporal-sa/temporal-cloud-proxy/config"
 )
 
 // Mock implementations
@@ -184,7 +184,7 @@ func TestNewProxyProvider_Success(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			configProvider := &MockConfigProvider{config: tt.config}
 			logger := zap.NewNop()
-			
+
 			mockAuthFactory := &MockAuthenticatorFactory{}
 			mockCodecFactory := &MockEncryptionCodecFactory{}
 
@@ -315,7 +315,7 @@ func TestProxyServer_Invoke_Success(t *testing.T) {
 	// Test invoke - this will fail because we don't have a real gRPC connection,
 	// but we can test the metadata validation logic
 	err = provider.GetConnectionMux().Invoke(ctx, "/test.Service/TestMethod", nil, nil)
-	
+
 	// We expect this to fail with a connection error, not a validation error
 	assert.Error(t, err)
 	// Should not be a validation error (InvalidArgument)
@@ -338,7 +338,7 @@ func TestProxyServer_Invoke_MissingWorkloadId(t *testing.T) {
 	ctx := context.Background()
 
 	err = provider.GetConnectionMux().Invoke(ctx, "/test.Service/TestMethod", nil, nil)
-	
+
 	assert.Error(t, err)
 	st, ok := status.FromError(err)
 	require.True(t, ok)
@@ -362,7 +362,7 @@ func TestProxyServer_Invoke_InvalidWorkloadId(t *testing.T) {
 	ctx := metadata.NewIncomingContext(context.Background(), md)
 
 	err = provider.GetConnectionMux().Invoke(ctx, "/test.Service/TestMethod", nil, nil)
-	
+
 	assert.Error(t, err)
 	st, ok := status.FromError(err)
 	require.True(t, ok)
@@ -386,7 +386,7 @@ func TestProxyServer_Invoke_MultipleWorkloadIds(t *testing.T) {
 	ctx := metadata.NewIncomingContext(context.Background(), md)
 
 	err = provider.GetConnectionMux().Invoke(ctx, "/test.Service/TestMethod", nil, nil)
-	
+
 	assert.Error(t, err)
 	st, ok := status.FromError(err)
 	require.True(t, ok)
@@ -427,11 +427,11 @@ func TestProxyServer_Invoke_WithAuthentication(t *testing.T) {
 	require.NoError(t, err)
 
 	tests := []struct {
-		name           string
-		setupAuth      func()
-		metadata       map[string]string
-		expectedCode   codes.Code
-		expectedMsg    string
+		name         string
+		setupAuth    func()
+		metadata     map[string]string
+		expectedCode codes.Code
+		expectedMsg  string
 	}{
 		{
 			name: "missing authorization header",
@@ -480,7 +480,7 @@ func TestProxyServer_Invoke_WithAuthentication(t *testing.T) {
 			ctx := metadata.NewIncomingContext(context.Background(), md)
 
 			err = provider.GetConnectionMux().Invoke(ctx, "/test.Service/TestMethod", nil, nil)
-			
+
 			assert.Error(t, err)
 			st, ok := status.FromError(err)
 			require.True(t, ok)
@@ -503,7 +503,7 @@ func TestProxyServer_NewStream_NotSupported(t *testing.T) {
 	require.NoError(t, err)
 
 	stream, err := provider.GetConnectionMux().NewStream(context.Background(), nil, "/test.Service/TestMethod")
-	
+
 	assert.Nil(t, stream)
 	assert.Error(t, err)
 	st, ok := status.FromError(err)
@@ -520,10 +520,10 @@ func TestProxyServer_Stop_ErrorAggregation(t *testing.T) {
 	// This test verifies that Stop() properly aggregates errors from multiple connections
 	// We can't easily test namespaceConnection.Close() directly due to the concrete grpc.ClientConn type,
 	// but we can test the error aggregation behavior at the proxy level through integration testing.
-	
+
 	// For now, we'll focus on the more testable aspects of the proxy functionality
 	// The error aggregation logic in Close() methods is straightforward and follows the same pattern
 	// as the config validation error aggregation which is thoroughly tested.
-	
+
 	t.Skip("Skipping detailed Close() testing due to concrete grpc.ClientConn type - behavior is covered by integration tests")
 }

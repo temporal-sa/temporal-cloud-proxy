@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	"temporal-sa/temporal-cloud-proxy/crypto"
-	"temporal-sa/temporal-cloud-proxy/metrics"
+	"github.com/temporal-sa/temporal-cloud-proxy/crypto"
+	"github.com/temporal-sa/temporal-cloud-proxy/metrics"
 
 	commonpb "go.temporal.io/api/common/v1"
 	"go.temporal.io/sdk/client"

@@ -294,40 +294,20 @@ make test-race
 make benchmark
 ```
 
-## API Reference
+## Temporal Worker Configuration 
 
-### gRPC Interface
-
-The proxy implements the standard Temporal gRPC interface with additional metadata requirements:
-
-#### Required Metadata
+### Required Headers
 
 - `workload-id`: Identifies which workload configuration to use
 - `authorization`: Authentication token (when worker authentication is enabled)
 
-#### Example Client Usage
+### Example Implementations
 
-```go
-conn, err := grpc.Dial("proxy:7233", grpc.WithTransportCredentials(insecure.NewCredentials()))
-if err != nil {
-    log.Fatal(err)
-}
-
-// Add required metadata
-ctx := metadata.AppendToOutgoingContext(context.Background(),
-    "workload-id", "my-workload",
-    "authorization", "Bearer "+token,
-)
-
-// Use the connection with Temporal client
-client := temporal.NewClient(temporal.Options{
-    HostPort: "proxy:7233",
-    // ... other options
-})
-```
+- [Temporal Worker with SPIFFE authentication](github.com/temporal-sa/temporal-proxy-spiffe-worker)
+- [Temporal Worker with JWT authentication](github.com/temporal-sa/temporal-proxy-jwt-worker)
 
 
-### Debug Logging
+## Debug Logging
 
 Enable debug logging for detailed troubleshooting:
 
