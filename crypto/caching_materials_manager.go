@@ -4,9 +4,9 @@ import (
 	"context"
 	"crypto/sha256"
 	"fmt"
+	"github.com/temporal-sa/temporal-cloud-proxy/metrics"
 	"sort"
 	"sync"
-	"temporal-sa/temporal-cloud-proxy/metrics"
 	"time"
 
 	lru "github.com/hashicorp/golang-lru"
