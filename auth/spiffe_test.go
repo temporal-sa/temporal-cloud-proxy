@@ -41,60 +41,62 @@ func TestSpiffeAuthenticator_Init(t *testing.T) {
 		{
 			name: "valid configuration with all fields",
 			config: map[string]interface{}{
-				"trust_domain": "example.org",
-				"endpoint":     "unix:///tmp/spire-agent/public/api.sock",
-				"audiences":    []interface{}{"service1", "service2"},
+				"spiffe_ids": []string{"spiffe://example.org/service"},
+				"endpoint":   "unix:///tmp/spire-agent/public/api.sock",
+				"audiences":  []interface{}{"service1", "service2"},
 			},
 			expectError: false,
 			expectedAuth: &SpiffeAuthenticator{
-				TrustDomain: "example.org",
-				Endpoint:    "unix:///tmp/spire-agent/public/api.sock",
-				Audiences:   []string{"service1", "service2"},
+				SpiffeIDs: []string{"spiffe://example.org/service"},
+				Endpoint:  "unix:///tmp/spire-agent/public/api.sock",
+				Audiences: []string{"service1", "service2"},
 			},
 		},
 		{
 			name: "valid configuration without audiences",
 			config: map[string]interface{}{
-				"trust_domain": "example.org",
-				"endpoint":     "unix:///tmp/spire-agent/public/api.sock",
+				"spiffe_ids": []string{"spiffe://example.org/service"},
+				"endpoint":   "unix:///tmp/spire-agent/public/api.sock",
 			},
 			expectError: false,
 			expectedAuth: &SpiffeAuthenticator{
-				TrustDomain: "example.org",
-				Endpoint:    "unix:///tmp/spire-agent/public/api.sock",
-				Audiences:   nil,
+				SpiffeIDs: []string{"spiffe://example.org/service"},
+				Endpoint:  "unix:///tmp/spire-agent/public/api.sock",
+				Audiences: nil,
 			},
 		},
 		{
-			name: "missing trust_domain",
+			name: "missing spiffe_ids",
 			config: map[string]interface{}{
 				"endpoint": "unix:///tmp/spire-agent/public/api.sock",
 			},
 			expectError:   true,
-			errorContains: "trust_domain is required",
+			errorContains: "spiffe_ids is required",
 		},
+		{
+			name: "invalid spiffe_ids type",
+			config: map[string]interface{}{
+				"spiffe_ids": 123,
+				"endpoint":   "unix:///tmp/spire-agent/public/api.sock",
+			},
+			expectError:   true,
+			errorContains: "spiffe_ids is required",
+		},
+
 		{
 			name: "missing endpoint",
 			config: map[string]interface{}{
-				"trust_domain": "example.org",
+				"spiffe_ids": []string{"spiffe://example.org/service"},
 			},
 			expectError:   true,
 			errorContains: "endpoint is required",
 		},
-		{
-			name: "invalid trust_domain type",
-			config: map[string]interface{}{
-				"trust_domain": 123,
-				"endpoint":     "unix:///tmp/spire-agent/public/api.sock",
-			},
-			expectError:   true,
-			errorContains: "trust_domain is required",
-		},
+
 		{
 			name: "invalid endpoint type",
 			config: map[string]interface{}{
-				"trust_domain": "example.org",
-				"endpoint":     123,
+				"spiffe_ids": []string{"spiffe://example.org/service"},
+				"endpoint":   123,
 			},
 			expectError:   true,
 			errorContains: "endpoint is required",
@@ -102,15 +104,15 @@ func TestSpiffeAuthenticator_Init(t *testing.T) {
 		{
 			name: "mixed audience types",
 			config: map[string]interface{}{
-				"trust_domain": "example.org",
-				"endpoint":     "unix:///tmp/spire-agent/public/api.sock",
-				"audiences":    []interface{}{"service1", 123, "service2"},
+				"spiffe_ids": []string{"spiffe://example.org/service"},
+				"endpoint":   "unix:///tmp/spire-agent/public/api.sock",
+				"audiences":  []interface{}{"service1", 123, "service2"},
 			},
 			expectError: false,
 			expectedAuth: &SpiffeAuthenticator{
-				TrustDomain: "example.org",
-				Endpoint:    "unix:///tmp/spire-agent/public/api.sock",
-				Audiences:   []string{"service1", "service2"}, // non-string audiences are filtered out
+				SpiffeIDs: []string{"spiffe://example.org/service"},
+				Endpoint:  "unix:///tmp/spire-agent/public/api.sock",
+				Audiences: []string{"service1", "service2"}, // non-string audiences are filtered out
 			},
 		},
 	}
@@ -136,7 +138,7 @@ func TestSpiffeAuthenticator_Init(t *testing.T) {
 			} else {
 				assert.NoError(t, err)
 				if tt.expectedAuth != nil {
-					assert.Equal(t, tt.expectedAuth.TrustDomain, auth.TrustDomain)
+					assert.Equal(t, tt.expectedAuth.SpiffeIDs, auth.SpiffeIDs)
 					assert.Equal(t, tt.expectedAuth.Endpoint, auth.Endpoint)
 					assert.Equal(t, tt.expectedAuth.Audiences, auth.Audiences)
 				}
@@ -149,7 +151,7 @@ func TestSpiffeAuthenticator_Authenticate(t *testing.T) {
 	tests := []struct {
 		name          string
 		credentials   interface{}
-		trustDomain   string
+		spiffeIDs     []string
 		audiences     []string
 		setupMock     func() *MockJWTSource
 		expectError   bool
@@ -160,7 +162,7 @@ func TestSpiffeAuthenticator_Authenticate(t *testing.T) {
 		{
 			name:        "successful authentication with valid token",
 			credentials: "valid.jwt.token",
-			trustDomain: "spiffe://example.org",
+			spiffeIDs:   []string{"spiffe://example.org/service"},
 			audiences:   []string{"service1"},
 			setupMock: func() *MockJWTSource {
 				// This test would require mocking jwtsvid.ParseAndValidate
@@ -172,7 +174,7 @@ func TestSpiffeAuthenticator_Authenticate(t *testing.T) {
 		{
 			name:        "successful authentication with Bearer prefix",
 			credentials: "Bearer valid.jwt.token",
-			trustDomain: "spiffe://example.org",
+			spiffeIDs:   []string{"spiffe://example.org/service"},
 			audiences:   []string{"service1"},
 			setupMock: func() *MockJWTSource {
 				return nil
@@ -182,7 +184,7 @@ func TestSpiffeAuthenticator_Authenticate(t *testing.T) {
 		{
 			name:          "invalid credentials type",
 			credentials:   123,
-			trustDomain:   "spiffe://example.org",
+			spiffeIDs:     []string{"spiffe://example.org/service"},
 			audiences:     []string{"service1"},
 			expectError:   true,
 			errorContains: "credentials must be a string token",
@@ -190,7 +192,7 @@ func TestSpiffeAuthenticator_Authenticate(t *testing.T) {
 		{
 			name:          "empty token",
 			credentials:   "",
-			trustDomain:   "spiffe://example.org",
+			spiffeIDs:     []string{"spiffe://example.org/service"},
 			audiences:     []string{"service1"},
 			expectError:   true,
 			errorContains: "invalid token",
@@ -198,7 +200,7 @@ func TestSpiffeAuthenticator_Authenticate(t *testing.T) {
 		{
 			name:          "nil credentials",
 			credentials:   nil,
-			trustDomain:   "spiffe://example.org",
+			spiffeIDs:     []string{"spiffe://example.org/service"},
 			audiences:     []string{"service1"},
 			expectError:   true,
 			errorContains: "credentials must be a string token",
@@ -208,8 +210,8 @@ func TestSpiffeAuthenticator_Authenticate(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			auth := &SpiffeAuthenticator{
-				TrustDomain: tt.trustDomain,
-				Audiences:   tt.audiences,
+				SpiffeIDs: tt.spiffeIDs,
+				Audiences: tt.audiences,
 			}
 
 			ctx := context.Background()
@@ -353,11 +355,11 @@ func TestSpiffeAuthenticator_TokenParsing(t *testing.T) {
 
 // Helper method to test configuration parsing without JWT source creation
 func (s *SpiffeAuthenticator) initConfig(ctx context.Context, config map[string]interface{}) error {
-	trustDomain, ok := config["trust_domain"].(string)
-	if !ok {
-		return errors.New("trust_domain is required")
+	spiffeIDs, ok := config["spiffe_ids"].([]string)
+	if !ok || len(spiffeIDs) == 0 {
+		return errors.New("spiffe_ids is required")
 	}
-	s.TrustDomain = trustDomain
+	s.SpiffeIDs = spiffeIDs
 
 	endpoint, ok := config["endpoint"].(string)
 	if !ok {
@@ -389,9 +391,9 @@ func TestSpiffeAuthenticator_Integration(t *testing.T) {
 	ctx := context.Background()
 
 	config := map[string]interface{}{
-		"trust_domain": "example.org",
-		"endpoint":     "unix:///tmp/spire-agent/public/api.sock",
-		"audiences":    []interface{}{"test-service"},
+		"id":        "spiffe://example.org/service",
+		"endpoint":  "unix:///tmp/spire-agent/public/api.sock",
+		"audiences": []interface{}{"test-service"},
 	}
 
 	err := auth.Init(ctx, config)
@@ -419,34 +421,57 @@ func TestSpiffeAuthenticator_ConfigurationEdgeCases(t *testing.T) {
 		{
 			name: "nil config values",
 			config: map[string]interface{}{
-				"trust_domain": nil,
-				"endpoint":     nil,
+				"endpoint": nil,
 			},
 			expectError: true,
 		},
 		{
 			name: "empty string values",
 			config: map[string]interface{}{
-				"trust_domain": "",
-				"endpoint":     "",
+				"spiffe_ids": []string{""},
+				"endpoint":   "",
 			},
 			expectError: false, // Empty strings are valid, just not useful
 		},
 		{
 			name: "audiences as empty slice",
 			config: map[string]interface{}{
-				"trust_domain": "example.org",
-				"endpoint":     "unix:///tmp/spire-agent/public/api.sock",
-				"audiences":    []interface{}{},
+				"spiffe_ids": []string{"spiffe://example.org/service"},
+				"endpoint":   "unix:///tmp/spire-agent/public/api.sock",
+				"audiences":  []interface{}{},
 			},
 			expectError: false,
 		},
 		{
 			name: "audiences as nil",
 			config: map[string]interface{}{
-				"trust_domain": "example.org",
-				"endpoint":     "unix:///tmp/spire-agent/public/api.sock",
-				"audiences":    nil,
+				"spiffe_ids": []string{"spiffe://example.org/service"},
+				"endpoint":   "unix:///tmp/spire-agent/public/api.sock",
+				"audiences":  nil,
+			},
+			expectError: false,
+		},
+		{
+			name: "empty spiffe_ids slice",
+			config: map[string]interface{}{
+				"spiffe_ids": []string{},
+				"endpoint":   "unix:///tmp/spire-agent/public/api.sock",
+			},
+			expectError: true,
+		},
+		{
+			name: "nil spiffe_ids",
+			config: map[string]interface{}{
+				"spiffe_ids": nil,
+				"endpoint":   "unix:///tmp/spire-agent/public/api.sock",
+			},
+			expectError: true,
+		},
+		{
+			name: "multiple spiffe_ids",
+			config: map[string]interface{}{
+				"spiffe_ids": []string{"spiffe://example.org/service1", "spiffe://example.org/service2"},
+				"endpoint":   "unix:///tmp/spire-agent/public/api.sock",
 			},
 			expectError: false,
 		},
