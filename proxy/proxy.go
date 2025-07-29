@@ -5,13 +5,14 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"os"
+	"sync"
+	"time"
+
 	"github.com/temporal-sa/temporal-cloud-proxy/auth"
 	"github.com/temporal-sa/temporal-cloud-proxy/codec"
 	"github.com/temporal-sa/temporal-cloud-proxy/config"
 	"github.com/temporal-sa/temporal-cloud-proxy/metrics"
-	"os"
-	"sync"
-	"time"
 
 	"go.opentelemetry.io/otel/attribute"
 	"go.temporal.io/sdk/converter"

@@ -10,10 +10,10 @@ import (
 )
 
 type SpiffeAuthenticator struct {
-	TrustDomain string   `yaml:"trust_domain"`
-	Audiences   []string `yaml:"audiences"`
-	Endpoint    string   `yaml:"endpoint"`
-	jwtSource   *workloadapi.JWTSource
+	SpiffeIDs []string `yaml:"spiffe_ids"`
+	Audiences []string `yaml:"audiences"`
+	Endpoint  string   `yaml:"endpoint"`
+	jwtSource *workloadapi.JWTSource
 }
 
 func (s *SpiffeAuthenticator) Type() string {
@@ -21,11 +21,17 @@ func (s *SpiffeAuthenticator) Type() string {
 }
 
 func (s *SpiffeAuthenticator) Init(ctx context.Context, config map[string]interface{}) error {
-	trustDomain, ok := config["trust_domain"].(string)
-	if !ok {
-		return fmt.Errorf("trust_domain is required")
+	spiffeIDsRaw, ok := config["spiffe_ids"].([]interface{})
+	if !ok || len(spiffeIDsRaw) == 0 {
+		return fmt.Errorf("spiffe_ids is required")
 	}
-	s.TrustDomain = trustDomain
+	for _, id := range spiffeIDsRaw {
+		spiffeID, ok := id.(string)
+		if !ok {
+			return fmt.Errorf("spiffe_ids must contain only strings")
+		}
+		s.SpiffeIDs = append(s.SpiffeIDs, spiffeID)
+	}
 
 	endpoint, ok := config["endpoint"].(string)
 	if !ok {
@@ -53,13 +59,10 @@ func (s *SpiffeAuthenticator) Init(ctx context.Context, config map[string]interf
 }
 
 func (s *SpiffeAuthenticator) Authenticate(ctx context.Context, credentials interface{}) (*AuthenticationResult, error) {
-	token, ok := credentials.(string)
-	if !ok {
-		return nil, fmt.Errorf("credentials must be a string token")
+	token, err := s.extractToken(credentials)
+	if err != nil {
+		return nil, err
 	}
-
-	const prefix = "Bearer "
-	token = strings.TrimPrefix(token, prefix)
 
 	svid, err := jwtsvid.ParseAndValidate(token, s.jwtSource, s.Audiences)
 	if err != nil {
@@ -68,23 +71,39 @@ func (s *SpiffeAuthenticator) Authenticate(ctx context.Context, credentials inte
 		}, fmt.Errorf("invalid token: %w", err)
 	}
 
-	claims := make(map[string]interface{})
-	for k, v := range svid.Claims {
-		claims[k] = v
+	return s.validateSVID(svid)
+}
+
+func (s *SpiffeAuthenticator) extractToken(credentials interface{}) (string, error) {
+	token, ok := credentials.(string)
+	if !ok {
+		return "", fmt.Errorf("credentials must be a string token")
 	}
 
-	// TODO should be clearer on what is the trust domain / path / etc
-	if !strings.HasPrefix(svid.ID.String(), s.TrustDomain) {
-		return &AuthenticationResult{
-			Authenticated: false,
-		}, fmt.Errorf("invalid trust domain and/or subject: %v", svid.ID.String())
+	const prefix = "Bearer "
+	return strings.TrimPrefix(token, prefix), nil
+}
+
+func (s *SpiffeAuthenticator) validateSVID(svid *jwtsvid.SVID) (*AuthenticationResult, error) {
+	for _, allowedID := range s.SpiffeIDs {
+		if svid.ID.String() == allowedID {
+			claims := make(map[string]interface{})
+			for k, v := range svid.Claims {
+				claims[k] = v
+			}
+
+			return &AuthenticationResult{
+				Authenticated: true,
+				Subject:       svid.ID.String(),
+				Claims:        claims,
+				Expiration:    svid.Expiry,
+			}, nil
+		}
 	}
+
 	return &AuthenticationResult{
-		Authenticated: true,
-		Subject:       svid.ID.String(),
-		Claims:        claims,
-		Expiration:    svid.Expiry,
-	}, nil
+		Authenticated: false,
+	}, fmt.Errorf("invalid SPIFFE ID: %s not in allowed list %v", svid.ID.String(), s.SpiffeIDs)
 }
 
 func (s *SpiffeAuthenticator) Close() error {
