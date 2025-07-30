@@ -37,7 +37,7 @@ make build
 3. Copy and configure the sample config:
 
 ```bash
-cp config.yaml.sample config.yaml
+cp config.sample.yaml config.yaml
 # Edit config.yaml with your settings
 ```
 
