@@ -39,12 +39,16 @@ func (s *SpiffeAuthenticator) Init(ctx context.Context, config map[string]interf
 	}
 	s.Endpoint = endpoint
 
-	if audiencesRaw, ok := config["audiences"].([]interface{}); ok {
-		for _, a := range audiencesRaw {
-			if audience, ok := a.(string); ok {
-				s.Audiences = append(s.Audiences, audience)
-			}
+	audiencesRaw, ok := config["audiences"].([]interface{})
+	if !ok || len(audiencesRaw) == 0 {
+		return fmt.Errorf("audiences is required")
+	}
+	for _, a := range audiencesRaw {
+		audience, ok := a.(string)
+		if !ok {
+			return fmt.Errorf("audiences must contain only strings")
 		}
+		s.Audiences = append(s.Audiences, audience)
 	}
 
 	clientOptions := workloadapi.WithClientOptions(workloadapi.WithAddr(s.Endpoint))
