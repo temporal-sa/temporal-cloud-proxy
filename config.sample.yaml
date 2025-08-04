@@ -35,7 +35,8 @@ workloads:
 #    authentication: # spiffe authentication example
 #      type: "spiffe"
 #      config:
-#        trust_domain: "spiffe://example.org/"
+#        spiffe_ids:
+#          - "spiffe://example.org/my.workload.1"
 #        endpoint: "unix:///tmp/spire-agent/public/api.sock"
 #        audiences:
 #          - "temporal_cloud_proxy"

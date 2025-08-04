@@ -108,7 +108,7 @@ workloads:
     authentication:
       type: "spiffe"
       config:
-        trust_domain: "spiffe://company.com/"
+        spiffe_ids: ["spiffe://company.com/prod.company"]
         endpoint: "unix:///tmp/spire-agent/public/api.sock"
 
   - workload_id: "staging"
@@ -166,7 +166,7 @@ authentication:
 authentication:
   type: "spiffe"
   config:
-    trust_domain: "spiffe://company.com/"
+    spiffe_ids: ["spiffe://company.com/prod.company"]
     endpoint: "unix:///tmp/spire-agent/public/api.sock"
     audiences: ["temporal_cloud_proxy"]
 ```
