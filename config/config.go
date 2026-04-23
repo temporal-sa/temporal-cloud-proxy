@@ -18,6 +18,8 @@ const (
 
 	GcpRegionEnvVar  = "GCP_REGION"
 	DefaultGcpRegion = "us-central1"
+
+	AzureVaultURLEnvVar = "AZURE_VAULT_URL"
 )
 
 type (
