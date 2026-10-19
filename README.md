@@ -1,5 +1,10 @@
 # Temporal Cloud Proxy
 
+> [!WARNING]
+> **This repository is archived and no longer maintained.**
+> Please use the official [Temporal Proxy](https://github.com/temporalio/temporal-proxy) instead.
+> See the [Temporal Proxy documentation](https://docs.temporal.io/production-deployment/temporal-proxy/) to get started.
+
 A Temporal Cloud proxy that handles Temporal namespace authentication, payload encryption/decryption, and client/worker authentication for multiple workloads with different configurations.
 
 ## Key Features
